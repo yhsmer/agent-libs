@@ -156,6 +156,7 @@ struct scap
 	// Anonymous struct with bpf stuff
 	struct
 	{
+		// save BPF prog fds used for close
 		int m_bpf_prog_fds[BPF_PROGS_MAX];
 		int m_bpf_prog_cnt;
 		bool m_bpf_fillers[BPF_PROGS_MAX];

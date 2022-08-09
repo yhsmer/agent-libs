@@ -17,6 +17,8 @@ or GPL2.txt for full copies of the license.
 #include "types.h"
 #include "builtins.h"
 
+#define BPF_DEBUG
+
 #define _READ(P) ({ typeof(P) _val;				\
 		    memset(&_val, 0, sizeof(_val));		\
 		    bpf_probe_read(&_val, sizeof(_val), &P);	\
@@ -485,6 +487,8 @@ static __always_inline void call_filler(void *ctx,
 	if (!filler_info)
 		goto cleanup;
 
+	// 尾调用，为了突破BPF程序4096条指令的限制，会重置上下文，无法使用ctx传递信息
+	// ctx 上下文， tail_map 程序数据映射（BPF中用于配合尾调用使用，key为index，value值为prog的fd）,  filler_info->filler_id key值
 	bpf_tail_call(ctx, &tail_map, filler_info->filler_id);
 	bpf_printk("Can't tail call filler evt=%d, filler=%d\n",
 		   state->tail_ctx.evt_type,

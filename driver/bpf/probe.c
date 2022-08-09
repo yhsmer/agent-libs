@@ -29,6 +29,29 @@ or GPL2.txt for full copies of the license.
 #include <uapi/linux/tcp.h>
 #include <uapi/linux/udp.h>
 
+/*
+## 表示连接
+int bpf_##event -> int bpf_${event}
+
+# 表示加双引号
+#event -> "${event}"
+
+types.h
+#ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
+#define TP_NAME "raw_tracepoint/"
+#else
+#define TP_NAME "tracepoint/"
+#endif
+
+# 表示编译到名为NAME的section中
+#define __bpf_section(NAME) __attribute__((section(NAME), used))
+
+
+# C特性字符串会自动合并（cout一样合并），__bpf_section("1" "2" "3") -> __bpf_section("123")
+__bpf_section(TP_NAME prefix #event)
+
+*/
+
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
 #define BPF_PROBE(prefix, event, type)			\
 __bpf_section(TP_NAME #event)				\
@@ -46,6 +69,46 @@ int bpf_kp_##event(struct pt_regs *ctx)
 #define BPF_KRET_PROBE(event)				\
 __bpf_section(KRET_NAME #event)				\
 int bpf_kret_##event(struct pt_regs *ctx)
+
+#define BPF_UPROBE(event, func_symbol)			\
+__bpf_section(UP_NAME #event ":" #func_symbol)			\
+int bpf_up_##event(struct pt_regs *ctx)
+
+#define BPF_URET_PROBE(event, func_symbol)			\
+__bpf_section(URET_NAME #event ":" #func_symbol)			\
+int bpf_uret_##event(struct pt_regs *ctx)
+
+
+BPF_UPROBE(fun, main.fun)
+{
+    bpf_printk("============== hit fun uprobe\n");
+    struct sysdig_bpf_settings *settings;
+    enum ppm_event_type evt_type;
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+    evt_type = PPME_FUN_E;
+    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
+        bpf_fun_uprobe_e(ctx);
+    }
+    return 0;
+}
+
+BPF_URET_PROBE(uret_fun, fun)
+{
+    struct sysdig_bpf_settings *settings;
+    enum ppm_event_type evt_type;
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+    evt_type = PPME_FUN_X;
+    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
+        bpf_fun_uprobe_x(ctx);
+    }
+    return 0;
+}
 
 BPF_PROBE("raw_syscalls/", sys_enter, sys_enter_args)
 {
@@ -324,6 +387,7 @@ BPF_PROBE("net/", netif_receive_skb, netif_receive_skb_args)
 }
 */
 
+
 BPF_KPROBE(tcp_drop)
 {
 	struct sysdig_bpf_settings *settings;
@@ -528,8 +592,6 @@ BPF_KPROBE(tcp_set_state)
 			bpf_tcp_set_state_kprobe_e(ctx);
 		}
 	}
-
-
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 */
+#include <iostream>
 
 #ifndef _WIN32
 #define __STDC_FORMAT_MACROS
@@ -22,16 +23,23 @@ limitations under the License.
 #endif
 #include <stdio.h>
 #include <algorithm>
+#include <map>
+#include <string>
+#include <sys/stat.h>
 #include "sinsp.h"
 #include "sinsp_int.h"
 #include "protodecoder.h"
 #include "tracers.h"
+
 
 #ifdef HAS_ANALYZER
 #include "tracer_emitter.h"
 #endif
 
 extern sinsp_evttables g_infotables;
+static const char *bpf_probe;
+struct stat file;
+unordered_map<unsigned long long, bool> inodemap;
 
 static void copy_ipv6_address(uint32_t* dest, uint32_t* src)
 {
@@ -1256,6 +1264,37 @@ void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* thr
 	}
 }
 
+static void handle_user_space_probe(scap* handle, sinsp_threadinfo *threadinfo){
+    cout << "thread: " << threadinfo->m_tid << ' ' << threadinfo->m_pid << ' '
+         << threadinfo->get_comm() << ' '
+         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
+    // thread: 6627 6626 main /root/code/cc/ /root/code/cc/main
+
+    if(!bpf_probe)
+    {
+        bpf_probe = scap_get_bpf_probe_from_env();
+    }
+
+    if(threadinfo->get_exepath().empty())
+    {
+        return;
+    }
+
+    const char *target_file_path = threadinfo->get_exepath().c_str();
+    if(stat(target_file_path, &file) == -1)
+    {
+        perror("stat error");
+        return;
+    }
+    if(inodemap[file.st_ino] == false)
+    {
+        cout << "\033[33m" << "handle " << target_file_path << "\033[0m"<< endl ;
+        handle_user_space_probe(handle, bpf_probe, true, target_file_path);
+        cout << "\033[0;32;31m" << scap_getlasterr(handle) << "\033[m" << endl;
+    }
+    inodemap[file.st_ino] = true;
+}
+
 bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable)
 {
 #ifdef GATHER_INTERNAL_STATS
@@ -1289,7 +1328,8 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 	threadinfo->allocate_private_state();
 	m_threadtable.put(threadinfo);
 
-	return true;
+    handle_user_space_probe(m_inspector->m_h, threadinfo);
+    return true;
 }
 
 void sinsp_thread_manager::remove_thread(int64_t tid, bool force)

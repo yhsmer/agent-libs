@@ -118,6 +118,38 @@ static __always_inline int bpf_##x(void *ctx)				\
 									\
 static __always_inline int __bpf_##x(struct filler_data *data)		\
 
+#define UP_FILLER_RAW(x)						\
+static __always_inline int __bpf_##x(struct filler_data *data);		\
+									\
+static __always_inline int bpf_##x(void *ctx)				\
+
+#define UP_FILLER(x)							\
+static __always_inline int __bpf_##x(struct filler_data *data);		\
+									\
+static __always_inline int bpf_##x(void *ctx)				\
+{									\
+	struct filler_data data;					\
+	int res;							\
+									\
+	res = init_filler_data(ctx, &data, false);			\
+	if (res == PPM_SUCCESS) {					\
+		if (!data.state->tail_ctx.len)				\
+			write_evt_hdr(&data);				\
+		res = __bpf_##x(&data);					\
+	}								\
+									\
+	if (res == PPM_SUCCESS)						\
+		res = push_evt_frame(ctx, &data);			\
+									\
+	if (data.state)							\
+		data.state->tail_ctx.prev_res = res;			\
+									\
+	bpf_kp_terminate_filler(&data);	\
+	return 0;							\
+}									\
+									\
+static __always_inline int __bpf_##x(struct filler_data *data)		\
+
 FILLER_RAW(terminate_filler)
 {
 	struct sysdig_bpf_per_cpu_state *state;
@@ -2432,12 +2464,12 @@ FILLER(sys_generic, true)
 	native_id = bpf_syscall_get_nr(data->ctx);
 	sysdig_id = bpf_map_lookup_elem(&syscall_code_routing_table, &native_id);
 	if (!sysdig_id) {
-		bpf_printk("no routing for syscall %d\n", native_id);
+//		bpf_printk("no routing for syscall %d\n", native_id);
 		return PPM_FAILURE_BUG;
 	}
 
-	if (*sysdig_id == PPM_SC_UNKNOWN)
-		bpf_printk("no syscall for id %d\n", native_id);
+//	if (*sysdig_id == PPM_SC_UNKNOWN){}
+//		bpf_printk("no syscall for id %d\n", native_id);
 
 	/*
 	 * id
@@ -4664,8 +4696,7 @@ KP_FILLER(tcp_retransmit_skb_kprobe_e)
 
 KP_FILLER(tcp_connect_kprobe_x)
 {
-
-	struct pt_regs *args = (struct pt_regs*)data->ctx;
+    struct pt_regs *args = (struct pt_regs*)data->ctx;
 	int retval = 0;
 	retval= regs_return_value(args);
 	unsigned long long id = bpf_get_current_pid_tgid() & 0xffffffff;
@@ -4704,6 +4735,37 @@ KP_FILLER(tcp_set_state_kprobe_e)
 	if (res != PPM_SUCCESS)
 		return res;
 	return 0;
+}
+
+UP_FILLER(fun_uprobe_e)
+{
+    int res;
+    struct pt_regs* regs = (struct pt_regs*) data->ctx;
+    bpf_printk("hit fun filler\n");
+    const void *sp = (const void *)_READ(regs->sp);
+
+    long a;
+    bpf_probe_read(&a, sizeof(a), sp + 8);
+    bpf_printk("a: %d \n", a);
+
+    res = bpf_val_to_ring(data, a);
+    if (res != PPM_SUCCESS)
+        return res;
+
+    return 0;
+}
+
+UP_FILLER(fun_uprobe_x)
+{
+    int res;
+    struct pt_regs* regs = (struct pt_regs*) data->ctx;
+    int a = _READ(regs->ax);
+    bpf_printk("uretprobe: %d \n", a);
+    res = bpf_val_to_ring(data, a);
+    if (res != PPM_SUCCESS)
+        return res;
+
+    return 0;
 }
 
 FILLER(tcp_retransmit_skb_e, false)

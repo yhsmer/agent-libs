@@ -26,6 +26,7 @@ limitations under the License.
 #include <sys/time.h>
 #endif // _WIN32
 
+#include <iostream>
 #include "scap_open_exception.h"
 #include "sinsp.h"
 #include "sinsp_int.h"
@@ -493,7 +494,6 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 	}
 
 	add_suppressed_comms(oargs);
-
 	int32_t scap_rc;
 	m_h = scap_open(oargs, error, &scap_rc);
 
@@ -874,9 +874,10 @@ void sinsp::on_new_entry_from_proc(void* context,
 		{
 			thread_added = m_thread_manager->add_thread(newti, true);
 		}
+
 		if (!thread_added) {
-			delete newti;
-		}
+            delete newti;
+        }
 	}
 	else
 	{
@@ -886,7 +887,6 @@ void sinsp::on_new_entry_from_proc(void* context,
 		{
 			sinsp_threadinfo* newti = build_threadinfo();
 			newti->init(tinfo);
-
 			if (!m_thread_manager->add_thread(newti, true)) {
 				ASSERT(false);
 				delete newti;

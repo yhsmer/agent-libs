@@ -23,3 +23,8 @@ driver/driver_config.h
 .vscode
 .cache.mk
 build*
+.idea/
+cmake-build-debug/
+cmake-build-debug-remote-host/
+.idea/
+test-file
