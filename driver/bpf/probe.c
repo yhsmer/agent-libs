@@ -528,8 +528,21 @@ BPF_KPROBE(tcp_set_state)
 			bpf_tcp_set_state_kprobe_e(ctx);
 		}
 	}
+}
 
-
+BPF_KPROBE(inet_csk_accept){
+	struct sysdig_bpf_settings *settings;
+	enum ppm_event_type evt_type;
+	settings = get_bpf_settings();
+	if (!settings)
+		return 0;
+	if (!settings->capture_enabled)
+		return 0;
+	
+	evt_type = PPME_INET_CSK_ACCEPT_E;
+	prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP);
+	bpf_inet_csk_accept_kprobe_e(ctx);
+	return 0;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
