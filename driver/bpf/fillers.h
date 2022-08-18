@@ -4764,7 +4764,7 @@ KP_FILLER(inet_csk_accept_kprobe_e){
 	if (res != PPM_SUCCESS)
 		return res;
 
-	res = bpf_val_to_ring(data, syn_max);
+	res = bpf_val_to_ring(data, max(8U, syn_max));
 	if (res != PPM_SUCCESS)
 		return res;
 
