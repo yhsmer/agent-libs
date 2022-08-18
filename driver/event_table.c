@@ -354,8 +354,8 @@ const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {
 	/* PPME_TCP_SEND_RESET_X */{"tcp_send_reset", EC_NET, EF_UNUSED, 0},
 	/* PPME_TCP_RECEIVE_RESET_E */{"tcp_receive_reset", EC_NET, EF_DROP_SIMPLE_CONS | EF_NONE_PARSE, 2, {{"tuple", PT_SOCKTUPLE, PF_NA}, {"state", PT_UINT32, PF_DEC} } },
 	/* PPME_TCP_RECEIVE_RESET_X */{"tcp_send_reset", EC_NET, EF_UNUSED, 0},
-	/* PPME_INET_CSK_ACCEPT_E */{"inet_csk_accept", EC_NET, EF_NONE, 0},
-	/* PPME_INET_CSK_ACCEPT_X */{"inet_csk_accept_x", EC_NET, EF_NONE, 0}
+	/* PPME_INET_CSK_ACCEPT_E */{"inet_csk_accept", EC_NET, EF_NONE, 7, {{"pid", PT_PID, PF_DEC}, {"sport", PT_UINT16, PF_DEC}, {"saddr", PT_UINT32, PF_DEC}, {"syn_len", PT_INT64, PF_DEC}, {"syn_max", PT_UINT32, PF_DEC}, {"accept_len", PT_UINT32, PF_DEC}, {"accept_max", PT_UINT32, PF_DEC} }},
+	/* PPME_INET_CSK_ACCEPT_X */{"inet_csk_accept", EC_NET, EF_NONE, 0}
 	/* NB: Starting from scap version 1.2, event types will no longer be changed when an event is modified, and the only kind of change permitted for pre-existent events is adding parameters.
 	 *     New event types are allowed only for new syscalls or new internal events.
 	 *     The number of parameters can be used to differentiate between event versions.

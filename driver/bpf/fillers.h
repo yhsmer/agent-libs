@@ -4692,7 +4692,6 @@ KP_FILLER(tcp_set_state_kprobe_e)
 
 	u8 port = 0;
 	bpf_probe_read(&port, sizeof(port), (void *)&sk->sk_dport);
-	bpf_printk("[tcp_set_state_kprobe_e] port: %d\n", port);
 
 	int res;
 	res = sock_to_ring(data, sk);
@@ -4711,36 +4710,73 @@ KP_FILLER(tcp_set_state_kprobe_e)
 
 KP_FILLER(inet_csk_accept_kprobe_e){
 	struct pt_regs *args = (struct pt_regs*)data->ctx;
-	
-	/*
-	struct sock *sk = (struct sock *)_READ(args->di);
-	if(sk != NULL){
-		bpf_printk("[inet_csk_accept_e]: sk: %p \n", sk);
-	}
-	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct request_sock_queue *queue = &icsk->icsk_accept_queue;
-	struct request_sock	*rskq_accept_head = &queue->rskq_accept_head;
-	bpf_printk("[inet_csk_accept_e]: rskq_accept_head: %p \n", rskq_accept_head);
-	*/
-
 	struct inet_connection_sock *icsk = (struct inet_connection_sock *)_READ(args->di);
 	struct request_sock_queue queue = (struct request_sock_queue)_READ(icsk->icsk_accept_queue);
-	struct request_sock *rskq_accept_tail = (struct request_sock *)_READ(queue.rskq_accept_tail);
-	struct sock *sk = (struct sock *)_READ(rskq_accept_tail->sk);
 
-	u8 port = 0;
-	bpf_probe_read(&port, sizeof(port), (void *)&sk->sk_dport);
-	bpf_printk("[inet_csk_accept_e]: port: %d\n", port);
-
-	/*
 	atomic_t qlen;
-	bpf_probe_read(&qlen, sizeof(qlen), &queue->qlen);
-	bpf_printk("[inet_csk_accept_e]: %d\n", qlen.counter);
-	*/
+	bpf_probe_read(&qlen, sizeof(qlen), &queue.qlen);
+	bpf_printk("[inet_csk_accept_e]: qlen: %d\n", qlen.counter);
 
-	//bpf_printk("[inet_csk_accept_e]: %d\n", queue->young.counter);
+	struct request_sock *rskq_accept_head = (struct request_sock *)_READ(queue.rskq_accept_head);
+	struct sock *sk = (struct sock *)_READ(rskq_accept_head->sk);
+	struct sock *sk_listener = (struct sock *)_READ(rskq_accept_head->rsk_listener);
 
+	u32 syn_max = 0;
+	bpf_probe_read(&syn_max, sizeof(syn_max), (void *)&sk_listener->sk_max_ack_backlog);
+	bpf_printk("[inet_csk_accept_e]: syn_max: %d\n", syn_max);
+	bpf_printk("[inet_csk_accept_e]: syn_max_8U: %d\n", max(8U, syn_max));
+
+	u32	sk_ack_backlog = 0;
+	u32	sk_max_ack_backlog = 0;
+	bpf_probe_read(&sk_ack_backlog, sizeof(sk_ack_backlog), (void *)&sk->sk_ack_backlog);
+	bpf_probe_read(&sk_max_ack_backlog, sizeof(sk_max_ack_backlog), (void *)&sk->sk_max_ack_backlog);
+	bpf_printk("[inet_csk_accept_e]: sk_ack_backlog: %d\n", sk_ack_backlog);
+	bpf_printk("[inet_csk_accept_e]: sk_max_ack_backlog: %d\n", sk_max_ack_backlog);
+
+	const struct inet_sock *inet = inet_sk(sk);
+	u16 sport = 0;
+    u32 saddr = 0;
+	bpf_probe_read(&sport, sizeof(sport), (void *)&inet->inet_sport);
+	bpf_probe_read(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
+    sport = ntohs(sport);
+	bpf_printk("sport: %d\n", sport);
+    bpf_printk("saddr: %u\n", saddr);
+
+	if(sport == 0 || saddr == 0) return 0;
+
+	unsigned long long pid = bpf_get_current_pid_tgid() & 0xffffffff;
+	bpf_printk("pid: %d\n", pid);
+
+	int res;
+	res = bpf_val_to_ring(data, pid);
+	if (res != PPM_SUCCESS)
+		return res;
+
+	res = bpf_val_to_ring(data, sport);
+	if (res != PPM_SUCCESS)
+		return res;
+
+    res = bpf_val_to_ring(data, saddr);
+	if (res != PPM_SUCCESS)
+		return res;
 	
+	res = bpf_val_to_ring(data, qlen.counter);
+	if (res != PPM_SUCCESS)
+		return res;
+
+	res = bpf_val_to_ring(data, syn_max);
+	if (res != PPM_SUCCESS)
+		return res;
+
+	res = bpf_val_to_ring(data, sk_ack_backlog);
+	if (res != PPM_SUCCESS)
+		return res;
+
+	res = bpf_val_to_ring(data, sk_max_ack_backlog);
+	if (res != PPM_SUCCESS)
+		return res;
+
+	bpf_printk("inet_csk_accept_kprobe_e end ! ! \n");
 	return 0;
 }
 
