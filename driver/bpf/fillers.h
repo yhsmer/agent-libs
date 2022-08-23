@@ -4710,21 +4710,11 @@ KP_FILLER(tcp_set_state_kprobe_e)
 
 KP_FILLER(inet_csk_accept_kprobe_e){
 	struct pt_regs *args = (struct pt_regs*)data->ctx;
-	struct inet_connection_sock *icsk = (struct inet_connection_sock *)_READ(args->di);
-	struct request_sock_queue queue = (struct request_sock_queue)_READ(icsk->icsk_accept_queue);
-
-	atomic_t qlen;
-	bpf_probe_read(&qlen, sizeof(qlen), &queue.qlen);
-	bpf_printk("[inet_csk_accept_e]: qlen: %d\n", qlen.counter);
-
-	struct request_sock *rskq_accept_head = (struct request_sock *)_READ(queue.rskq_accept_head);
-	struct sock *sk = (struct sock *)_READ(rskq_accept_head->sk);
-	struct sock *sk_listener = (struct sock *)_READ(rskq_accept_head->rsk_listener);
+	struct sock *sk = (struct sock *)_READ(args->di);
 
 	u32 syn_max = 0;
-	bpf_probe_read(&syn_max, sizeof(syn_max), (void *)&sk_listener->sk_max_ack_backlog);
+	bpf_probe_read(&syn_max, sizeof(syn_max), (void *)&sk->sk_max_ack_backlog);
 	bpf_printk("[inet_csk_accept_e]: syn_max: %d\n", syn_max);
-	bpf_printk("[inet_csk_accept_e]: syn_max_8U: %d\n", max(8U, syn_max));
 
 	u32	sk_ack_backlog = 0;
 	u32	sk_max_ack_backlog = 0;
@@ -4733,7 +4723,17 @@ KP_FILLER(inet_csk_accept_kprobe_e){
 	bpf_printk("[inet_csk_accept_e]: sk_ack_backlog: %d\n", sk_ack_backlog);
 	bpf_printk("[inet_csk_accept_e]: sk_max_ack_backlog: %d\n", sk_max_ack_backlog);
 
-	const struct inet_sock *inet = inet_sk(sk);
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct request_sock_queue queue = (struct request_sock_queue)_READ(icsk->icsk_accept_queue);
+
+	atomic_t qlen;
+	bpf_probe_read(&qlen, sizeof(qlen), &queue.qlen);
+	bpf_printk("[inet_csk_accept_e]: qlen: %d\n", qlen.counter);
+
+	
+	struct request_sock *rskq_accept_head = (struct request_sock *)_READ(queue.rskq_accept_head);
+	struct sock *sck = (struct sock *)_READ(rskq_accept_head->sk);
+	const struct inet_sock *inet = inet_sk(sck);
 	u16 sport = 0;
     u32 saddr = 0;
 	bpf_probe_read(&sport, sizeof(sport), (void *)&inet->inet_sport);
@@ -4776,7 +4776,7 @@ KP_FILLER(inet_csk_accept_kprobe_e){
 	if (res != PPM_SUCCESS)
 		return res;
 
-	bpf_printk("inet_csk_accept_kprobe_e end ! ! \n");
+	bpf_printk("inet_csk_accept_kprobe_e end ! ! \n\n");
 	return 0;
 }
 
