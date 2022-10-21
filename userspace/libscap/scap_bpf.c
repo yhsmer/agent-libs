@@ -527,7 +527,7 @@ static int write_uprobe_events(const char *val)
 	return ret;
 }
 
-static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_insn *prog, int size, const char *target_file_path)
+static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_insn *prog, int size, const char *target_file_path)
 {
 	struct perf_event_attr attr = {};
 	enum bpf_prog_type program_type = BPF_PROG_TYPE_UNSPEC;
@@ -937,7 +937,7 @@ load_prog:
             if(memcmp(shname, "uprobe/", sizeof("uprobe/") - 1) == 0 ||
                memcmp(shname, "uretprobe/", sizeof("uretprobe/") - 1) == 0)
             {
-                res = load_tracepoint(handle, shname, data->d_buf, data->d_size, target_file_path);
+                res = load_and_attach(handle, shname, data->d_buf, data->d_size, target_file_path);
                 if(res != SCAP_SUCCESS && res != SCAP_UPROBE_SKIP)
                 {
                     goto cleanup;
@@ -951,7 +951,7 @@ load_prog:
 		   memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 		   memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0)
 		{
-			if(load_tracepoint(handle, shname, data->d_buf, data->d_size, NULL) != SCAP_SUCCESS)
+			if(load_and_attach(handle, shname, data->d_buf, data->d_size, NULL) != SCAP_SUCCESS)
 			{
 				goto cleanup;
 			}
