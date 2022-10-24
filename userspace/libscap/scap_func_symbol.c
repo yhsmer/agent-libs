@@ -1,7 +1,18 @@
-//
-// Created by yhsmer on 2022/9/14.
-//
-
+/*
+ * Copyright (c) 2016 GitHub, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include "scap_func_symbol.h"
 #include <fcntl.h>
 #include <unistd.h>
@@ -467,7 +478,7 @@ static int foreach_sym_core(const char *path, elf_symcb callback,
 	return res;
 }
 
-int resolve_symbol_name(const char *module, const char *symbol_name, uint64_t *res_addr) {
+int bcc_resolve_symname(const char *module, const char *symbol_name, uint64_t *res_addr) {
 	int module_type;
 
 	static struct symbol_option default_option = {
@@ -485,20 +496,20 @@ int resolve_symbol_name(const char *module, const char *symbol_name, uint64_t *r
 	sym.module = strdup(module);
 	sym.name = symbol_name;
 
-	if (elf_foreach_sym(module, _find_sym, &default_option, &sym) < 0)
+	if (bcc_elf_foreach_sym(module, _find_sym, &default_option, &sym) < 0)
 		return -1;
 	if (sym.offset == 0x0)
 		return -1;
 
 	// For executable (ET_EXEC) binaries and shared objects (ET_DYN), translate
 	// the virtual address to physical address in the binary file.
-	module_type = elf_get_type(sym.module);
+	module_type = bcc_elf_get_type(sym.module);
 	if (module_type == ET_EXEC || module_type == ET_DYN) {
 		struct load_addr_t addr = {
 			.target_addr = sym.offset,
 			.binary_addr = 0x0,
 		};
-		if (elf_foreach_load_section(sym.module, &_find_load, &addr) < 0)
+		if (bcc_elf_foreach_load_section(sym.module, &_find_load, &addr) < 0)
 			return -1;
 		if (!addr.binary_addr)
 			return -1;
@@ -507,13 +518,13 @@ int resolve_symbol_name(const char *module, const char *symbol_name, uint64_t *r
 	return 0;
 }
 
-int elf_foreach_sym(const char *path, elf_symcb callback,
-		    void *option, void *payload) {
+int bcc_elf_foreach_sym(const char *path, elf_symcb callback,
+                        void *option, void *payload) {
 	struct symbol_option *o = option;
 	return foreach_sym_core(path, callback, o, payload, 0);
 }
 
-int elf_get_type(const char *path) {
+int bcc_elf_get_type(const char *path) {
 	Elf *e;
 	GElf_Ehdr hdr;
 	int fd;
@@ -532,7 +543,7 @@ int elf_get_type(const char *path) {
 		return hdr.e_type;
 }
 
-int elf_foreach_load_section(const char *path,
+int bcc_elf_foreach_load_section(const char *path,
 			     elf_load_sectioncb callback,
 			     void *payload) {
 	Elf *e = NULL;

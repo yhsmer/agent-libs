@@ -623,7 +623,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
             char str[20];
             sscanf(event,"%[^:]",str);
             event = str;
-            err = resolve_symbol_name(target_file_path, func_symbol, &addr);
+            err = bcc_resolve_symname(target_file_path, func_symbol, &addr);
             if (err < 0){
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to resolve symbol name '%s' error '%s'\n", func_symbol, strerror(errno));
                 printf("\033[33m""%s: %s symbol don't exist\n"NONE, target_file_path, func_symbol);
