@@ -620,7 +620,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
                 i++;
             }
             func_symbol += (i + 1);
-            char str[20];
+            char str[200];
             sscanf(event,"%[^:]",str);
             event = str;
             err = bcc_resolve_symname(target_file_path, func_symbol, &addr);
