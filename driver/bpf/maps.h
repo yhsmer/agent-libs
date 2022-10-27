@@ -113,6 +113,13 @@ struct bpf_map_def __bpf_section("maps") stash_tuple_map = {
 	.max_entries = 65535,
 };
 
+struct bpf_map_def __bpf_section("maps") header_event_buffer_heap = {
+	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
+	.key_size = sizeof(u32),
+	.value_size = sizeof(struct grpc_event),
+	.max_entries = 1,
+};
+
 #endif // __KERNEL__
 
 #endif

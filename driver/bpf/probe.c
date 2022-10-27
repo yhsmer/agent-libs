@@ -625,7 +625,44 @@ BPF_PROBE("tcp/", tcp_receive_reset, tcp_reset_args){
 }
 #endif
 
+BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader)
+{
+    struct sysdig_bpf_settings *settings;
+    enum ppm_event_type evt_type;
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
 
+    evt_type = PPME_GRPC_E;
+    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
+        bpf_probe_loopy_writer_write_header_e(ctx);
+    }
+    return 0;
+}
+
+BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
+{
+//    bpf_printk("probe_http2_server_operate_headers\n");
+    return 0;
+}
+
+BPF_UPROBE(probe_hpack_header_encoder, golang.org/x/net/http2/hpack.(*Encoder).WriteField)
+{
+//    bpf_printk("probe_hpack_header_encoder\n");
+    return 0;
+}
+
+BPF_UPROBE(probe_http2_framer_check_frame_order, golang.org/x/net/http2.(*Framer).checkFrameOrder)
+{
+//    bpf_printk("probe_http2_framer_check_frame_order\n");
+    return 0;
+}
+
+BPF_UPROBE(probe_http2_framer_write_data, golang.org/x/net/http2.(*Framer).WriteDataPadded)
+{
+//    bpf_printk("probe_http2_framer_write_data\n");
+    return 0;
+}
 
 char kernel_ver[] __bpf_section("kernel_version") = UTS_RELEASE;
 

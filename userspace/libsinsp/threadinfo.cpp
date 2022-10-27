@@ -1327,8 +1327,11 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 	threadinfo->compute_program_hash();
 	threadinfo->allocate_private_state();
 	m_threadtable.put(threadinfo);
-
-    handle_user_space_probe(m_inspector->m_h, threadinfo);
+//    sinsp_threadinfo* tinfo = m_threadtable.get(threadinfo->m_tid);
+//    cout << tinfo->get_exepath() << endl;
+    if(threadinfo->is_main_thread()) {
+        handle_user_space_probe(m_inspector->m_h, threadinfo);
+    }
     return true;
 }
 
@@ -1352,6 +1355,9 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 	}
 	else if((nchilds = tinfo->m_nchilds) == 0 || force)
 	{
+        cout << "delete thread: " << tinfo->m_tid << ' ' << tinfo->m_pid << ' '
+             << tinfo->get_comm() << ' '
+             <<  tinfo->get_cwd() << ' ' << tinfo->get_exepath() << endl;
 		//
 		// Decrement the refcount of the main thread/program because
 		// this reference is gone
@@ -1414,7 +1420,9 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 #ifdef GATHER_INTERNAL_STATS
 		m_removed_threads->increment();
 #endif
-
+//        cout << "delete thread: " << tinfo->m_tid << ' ' << tinfo->m_pid << ' '
+//             << tinfo->get_comm() << ' '
+//             <<  tinfo->get_cwd() << ' ' << tinfo->get_exepath() << endl;
 		m_threadtable.erase(tid);
 
 		//
@@ -1428,6 +1436,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 			recreate_child_dependencies();
 		}
 	}
+
 }
 
 void sinsp_thread_manager::fix_sockets_coming_from_proc()

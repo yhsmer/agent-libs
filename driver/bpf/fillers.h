@@ -4911,4 +4911,96 @@ FILLER(tcp_receive_reset_e, false)
 	return 0;
 }
 
+static __inline struct grpc_event *get_header_event()
+{
+    uint32_t kZero = 0;
+    struct grpc_event *event = bpf_map_lookup_elem(&header_event_buffer_heap, &kZero);
+//    struct grpc_event *event = header_event_buffer_heap.lookup(&kZero);
+    if (event == NULL)
+    {
+        return NULL;
+    }
+    memset(event, 0, sizeof(*event));
+    return event;
+}
+
+static __inline int32_t get_fd_from_conn_intf_core(struct go_interface conn_intf)
+{
+    void *fd_ptr;
+    bpf_probe_read(&fd_ptr, sizeof(fd_ptr), conn_intf.ptr);
+
+    int64_t sysfd;
+    bpf_probe_read(&sysfd, sizeof(int64_t), fd_ptr + 16);
+    return sysfd;
+}
+
+static __inline int32_t get_fd_from_conn_intf(struct go_interface conn_intf)
+{
+    uint32_t tgid = bpf_get_current_pid_tgid() >> 32;
+    return get_fd_from_conn_intf_core(conn_intf);
+}
+
+static __inline int32_t get_fd_from_http2_Framer(const void *framer_ptr)
+{
+    struct go_interface io_writer_interface;
+    bpf_probe_read(&io_writer_interface, sizeof(io_writer_interface),
+                   framer_ptr + 112);
+
+    // At this point, we have the following struct:
+    // go.itab.*google.golang.org/grpc/internal/transport.bufWriter,io.Writer
+    // if (io_writer_interface.type != 1) {
+    //   bpf_trace_printk("io_writer_interface.type ERROR \n");
+    //   //return -1;
+    // }
+
+    struct go_interface conn_intf;
+    bpf_probe_read(&conn_intf, sizeof(conn_intf),
+                   io_writer_interface.ptr + 40);
+
+    return get_fd_from_conn_intf(conn_intf);
+}
+
+UP_FILLER(probe_loopy_writer_write_header_e)
+{
+    int res;
+    struct pt_regs* regs = (struct pt_regs*) data->ctx;
+    const void *sp = _READ(regs->sp);
+
+    uint32_t stream_id = 0;
+    bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
+
+    void *fields_ptr;
+    const int kFieldsPtrOffset = 24;
+    bpf_probe_read(&fields_ptr, sizeof(void *), sp + kFieldsPtrOffset);
+
+    int64_t fields_len;
+    const int kFieldsLenOffset = 8;
+    bpf_probe_read(&fields_len, sizeof(int64_t), sp + kFieldsPtrOffset + kFieldsLenOffset);
+
+    void *loopy_writer_ptr = NULL;
+    bpf_probe_read(&loopy_writer_ptr, sizeof(loopy_writer_ptr), sp + 8);
+
+    void *framer_ptr;
+    bpf_probe_read(&framer_ptr, sizeof(framer_ptr), loopy_writer_ptr + 40);
+
+    struct go_grpc_framer_t go_grpc_framer;
+    bpf_probe_read(&go_grpc_framer, sizeof(go_grpc_framer), framer_ptr);
+
+//    bpf_printk("stream_id: %d \n", stream_id);
+    const int32_t fd = get_fd_from_http2_Framer(go_grpc_framer.http2_framer);
+//    bpf_printk("fd: %d\n", fd);
+    if (fd == -1)
+    {
+        return 0;
+    }
+
+//    submit_headers(ctx, fields_ptr, fields_len, stream_id);
+
+//    res = bpf_val_to_ring(data, a);
+//    if (res != PPM_SUCCESS)
+//        return res;
+
+    return 0;
+}
+
 #endif

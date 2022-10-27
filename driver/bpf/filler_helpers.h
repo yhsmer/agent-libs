@@ -1448,5 +1448,8 @@ static __always_inline int tuple_to_ring(struct filler_data *data, struct tuple 
 	return bpf_val_to_ring_len(data, 0, size);
 }
 
+// --------------------------------------------- GRPC-FC Begin ---------------------------------------------
+// --------------------------------------------- GRPC-FC Begin ---------------------------------------------
+
 
 #endif
