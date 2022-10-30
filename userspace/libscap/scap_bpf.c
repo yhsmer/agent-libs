@@ -532,7 +532,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 	struct perf_event_attr attr = {};
 	enum bpf_prog_type program_type = BPF_PROG_TYPE_UNSPEC;
 	size_t insns_cnt;
-	char buf[1000];
+	char buf[256];
 	bool raw_tp = false;
 	int efd;
 	int err;
@@ -632,9 +632,9 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 			}
 
 //            printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
-
-			snprintf(buf, sizeof(buf), "%s%s %s:0x%"PRIx64"",
-				 is_uprobe ? "p:" : "r:", event, target_file_path, addr);
+            char *identifier = generate_identifier(target_file_path);
+			snprintf(buf, sizeof(buf), "%s%s%s %s:0x%"PRIx64"",
+				 is_uprobe ? "p:" : "r:", event, identifier ,target_file_path, addr);
 			err = write_uprobe_events(buf);
 			if (err < 0 && errno != 17) {
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to create uprobe '%s' error '%s'\n", event, strerror(errno));
@@ -643,7 +643,8 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 
 			strcpy(buf, "/sys/kernel/debug/tracing/events/uprobes/");
 			strcat(buf, event);
-			strcat(buf, "/id");
+            strcat(buf, identifier);
+            strcat(buf, "/id");
 		}
 	}
 

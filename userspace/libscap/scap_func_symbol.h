@@ -64,4 +64,11 @@ int bcc_elf_foreach_load_section(const char *path,
 			     elf_load_sectioncb callback,
 			     void *payload);
 
+void to_bytes(uint32_t val, uint8_t *bytes);
+
+uint32_t to_int32(const uint8_t *bytes);
+
+void encode(const uint8_t *initial_msg, size_t initial_len, uint8_t *digest);
+
+char* generate_identifier(char *msg);
 #endif // AGENT_LIBS_SCAP_FUNC_SYMBOL_H
