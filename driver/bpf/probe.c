@@ -642,25 +642,25 @@ BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/tran
 
 BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
 {
-//    bpf_printk("probe_http2_server_operate_headers\n");
+    bpf_printk("probe_http2_server_operate_headers\n");
     return 0;
 }
 
 BPF_UPROBE(probe_hpack_header_encoder, golang.org/x/net/http2/hpack.(*Encoder).WriteField)
 {
-//    bpf_printk("probe_hpack_header_encoder\n");
+    bpf_printk("probe_hpack_header_encoder\n");
     return 0;
 }
 
 BPF_UPROBE(probe_http2_framer_check_frame_order, golang.org/x/net/http2.(*Framer).checkFrameOrder)
 {
-//    bpf_printk("probe_http2_framer_check_frame_order\n");
+    bpf_printk("probe_http2_framer_check_frame_order\n");
     return 0;
 }
 
 BPF_UPROBE(probe_http2_framer_write_data, golang.org/x/net/http2.(*Framer).WriteDataPadded)
 {
-//    bpf_printk("probe_http2_framer_write_data\n");
+    bpf_printk("probe_http2_framer_write_data\n");
     return 0;
 }
 

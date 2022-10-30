@@ -512,7 +512,7 @@ static int write_kprobe_events(const char *val)
 	return ret;
 }
 
-static int write_uprobe_events(const char *val)
+static int write_uprobe_events(char *val)
 {
 	int fd, ret;
 
@@ -532,7 +532,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 	struct perf_event_attr attr = {};
 	enum bpf_prog_type program_type = BPF_PROG_TYPE_UNSPEC;
 	size_t insns_cnt;
-	char buf[256];
+	char buf[1000];
 	bool raw_tp = false;
 	int efd;
 	int err;
@@ -624,13 +624,14 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
             sscanf(event,"%[^:]",str);
             event = str;
             err = bcc_resolve_symname(target_file_path, func_symbol, &addr);
-            if (err < 0){
+            if (err < 0)
+            {
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to resolve symbol name '%s' error '%s'\n", func_symbol, strerror(errno));
-                printf("\033[33m""%s: %s symbol don't exist\n"NONE, target_file_path, func_symbol);
+//                printf("\033[33m""%s: %s symbol don't exist\n"NONE, target_file_path, func_symbol);
 				return SCAP_UPROBE_SKIP;
 			}
 
-            printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
+//            printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
 
 			snprintf(buf, sizeof(buf), "%s%s %s:0x%"PRIx64"",
 				 is_uprobe ? "p:" : "r:", event, target_file_path, addr);
@@ -657,7 +658,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
     if(fd < 0)
 	{
         puts("bpf_load_program fd error");
-        printf(RED "%s %s\n"NONE, target_file_path, event);
+//        printf(RED "%s %s\n"NONE, target_file_path, event);
         fprintf(stderr, "%s", error);
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s", errno, event, error);
 		free(error);
@@ -665,8 +666,28 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 	}
 
 	free(error);
-    // TODO: (yexm) 多次重复加载同一段BPF代码，会使得m_bpf_prog_fds越界, 如何删除无效的uprobe fd记录，或者复用索引
-	handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
+    if(target_file_path != NULL)
+    {
+        int cnt = 0;
+        // find an array space to store uprobe fd and pmc fd
+        while(handle->m_uprobe_array_idx_is_used[handle->m_uprobe_prog_cnt] == true)
+        {
+            handle->m_uprobe_prog_cnt = (handle->m_uprobe_prog_cnt + 1) % BPF_PROGS_MAX;
+            cnt++;
+            if(cnt > BPF_PROGS_MAX + 10)
+            {
+                snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "handle->m_uprobe_prog_fds[] is full, please enlarge the size of m_uprobe_prog_fds[] and m_uprobe_event_fd[]");
+                return SCAP_FAILURE;
+            }
+        }
+
+        handle->m_uprobe_prog_fds[handle->m_uprobe_prog_cnt] = fd;
+        handle->m_uprobe_array_idx_is_used[handle->m_uprobe_prog_cnt] = true;
+    }
+    else
+    {
+        handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
+    }
 
 	if(memcmp(event, "filler/", sizeof("filler/") - 1) == 0)
 	{
@@ -735,7 +756,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 		buf[err] = 0;
 		id = atoi(buf);
 		attr.config = id;
-        // TODO: (yexm) close(efd)
+
         efd = sys_perf_event_open(&attr, -1, 0, -1, 0);
 		if(efd < 0)
 		{
@@ -762,9 +783,13 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
         printf("===event id %d\n",id);
         printf("===event efd %d\n",efd);
         printf("===prog fd %d\n",fd);
+        handle->m_uprobe_event_fd[handle->m_uprobe_prog_cnt] = efd;
     }
-    //TODO: (yexm) update associated info between ftrace event id and PMC
-    handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
+    else
+    {
+        handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
+    }
+
 	return SCAP_SUCCESS;
 }
 
@@ -969,7 +994,11 @@ cleanup:
 }
 
 void __handle_user_space_probe(scap_t *handle, const char *path, bool user_space_probe, const char *target_file_path){
-    load_bpf_file(handle, path, user_space_probe, target_file_path);
+    int res = load_bpf_file(handle, path, user_space_probe, target_file_path);
+    if(res != SCAP_SUCCESS && res != SCAP_UPROBE_SKIP){
+//        scap_close(handle);
+//        exit(-1);
+    }
 }
 
 #endif // MINIMAL_BUILD
@@ -1403,7 +1432,7 @@ int32_t scap_bpf_close(scap_t *handle)
 			close(handle->m_devs[j].m_fd);
 		}
 	}
-
+    // clear tracepoint and kprobe pmc fd
 	for(j = 0; j < sizeof(handle->m_bpf_event_fd) / sizeof(handle->m_bpf_event_fd[0]); ++j)
 	{
 		if(handle->m_bpf_event_fd[j] > 0)
@@ -1412,7 +1441,7 @@ int32_t scap_bpf_close(scap_t *handle)
 			handle->m_bpf_event_fd[j] = 0;
 		}
 	}
-
+    // clear tracepoint and kprobe bpf prog fd
 	for(j = 0; j < sizeof(handle->m_bpf_prog_fds) / sizeof(handle->m_bpf_prog_fds[0]); ++j)
 	{
 		if(handle->m_bpf_prog_fds[j] > 0)
@@ -1421,6 +1450,33 @@ int32_t scap_bpf_close(scap_t *handle)
 			handle->m_bpf_prog_fds[j] = 0;
 		}
 	}
+    // clear uprobe pmc fd
+    for(j = 0; j < sizeof(handle->m_uprobe_event_fd) / sizeof(handle->m_uprobe_event_fd[0]); ++j)
+    {
+        if(handle->m_uprobe_event_fd[j] > 0)
+        {
+            close(handle->m_uprobe_event_fd[j]);
+            handle->m_uprobe_event_fd[j] = 0;
+        }
+    }
+    // clear uprobe bpf prog fd
+    for(j = 0; j < sizeof(handle->m_uprobe_prog_fds) / sizeof(handle->m_uprobe_prog_fds[0]); ++j)
+    {
+        if(handle->m_uprobe_prog_fds[j] > 0)
+        {
+            close(handle->m_uprobe_prog_fds[j]);
+            handle->m_uprobe_prog_fds[j] = 0;
+        }
+    }
+    // clear uprobe array idx map
+    for(j = 0; j < sizeof(handle->m_uprobe_array_idx_is_used) / sizeof(handle->m_uprobe_array_idx_is_used[0]); ++j)
+    {
+        if(handle->m_uprobe_array_idx_is_used[j] > 0)
+        {
+            close(handle->m_uprobe_array_idx_is_used[j]);
+            handle->m_uprobe_array_idx_is_used[j] = false;
+        }
+    }
 
 	for(j = 0; j < sizeof(handle->m_bpf_map_fds) / sizeof(handle->m_bpf_map_fds[0]); ++j)
 	{
@@ -1432,6 +1488,7 @@ int32_t scap_bpf_close(scap_t *handle)
 	}
 
 	handle->m_bpf_prog_cnt = 0;
+    handle->m_uprobe_prog_cnt = 0;
 	handle->m_bpf_prog_array_map_idx = -1;
 
 	return SCAP_SUCCESS;

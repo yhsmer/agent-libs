@@ -27,6 +27,8 @@ limitations under the License.
 #include <string>
 #include <sys/stat.h>
 #include "sinsp.h"
+#include "scap.h"
+#include "scap-int.h"
 #include "sinsp_int.h"
 #include "protodecoder.h"
 #include "tracers.h"
@@ -39,7 +41,8 @@ limitations under the License.
 extern sinsp_evttables g_infotables;
 static const char *bpf_probe;
 struct stat file;
-unordered_map<unsigned long long, bool> inodemap;
+unordered_map<unsigned long long, int> inodemap;
+unordered_map<int, int> inode_to_idx;
 
 static void copy_ipv6_address(uint32_t* dest, uint32_t* src)
 {
@@ -1264,12 +1267,8 @@ void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* thr
 	}
 }
 
-static void handle_user_space_probe(scap* handle, sinsp_threadinfo *threadinfo){
-    cout << "thread: " << threadinfo->m_tid << ' ' << threadinfo->m_pid << ' '
-         << threadinfo->get_comm() << ' '
-         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
-    // thread: 6627 6626 main /root/code/cc/ /root/code/cc/main
 
+static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo){
     if(!bpf_probe)
     {
         bpf_probe = scap_get_bpf_probe_from_env();
@@ -1280,19 +1279,36 @@ static void handle_user_space_probe(scap* handle, sinsp_threadinfo *threadinfo){
         return;
     }
 
-    const char *target_file_path = threadinfo->get_exepath().c_str();
-    if(stat(target_file_path, &file) == -1)
+    static char target_file_path[1024] = {0};
+    static char proc_path[20] = {0};
+    sprintf(proc_path, "/proc/%ld/exe", threadinfo->m_pid);
+
+    static long buf_len;
+    if((buf_len = readlink(proc_path, target_file_path,1024)) <=0)
     {
-        perror("stat error");
         return;
     }
-    if(inodemap[file.st_ino] == false)
+    target_file_path[buf_len] = '\0';
+
+    if(strlen(target_file_path) == 0)
     {
-        cout << "\033[33m" << "handle " << target_file_path << "\033[0m"<< endl ;
+        return;
+    }
+
+    if(stat(target_file_path, &file) == -1)
+    {
+        perror("threadinfo.cpp:1300 stat error");
+        return;
+    }
+    if(inodemap[file.st_ino] == 0)
+    {
+//        cout << "\033[33m" << "handle " << target_file_path << "\033[0m"<< endl ;
         handle_user_space_probe(handle, bpf_probe, true, target_file_path);
         cout << "\033[0;32;31m" << scap_getlasterr(handle) << "\033[m" << endl;
+
+        inode_to_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
     }
-    inodemap[file.st_ino] = true;
+    inodemap[file.st_ino]++;
 }
 
 bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable)
@@ -1327,9 +1343,9 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 	threadinfo->compute_program_hash();
 	threadinfo->allocate_private_state();
 	m_threadtable.put(threadinfo);
-//    sinsp_threadinfo* tinfo = m_threadtable.get(threadinfo->m_tid);
-//    cout << tinfo->get_exepath() << endl;
-    if(threadinfo->is_main_thread()) {
+
+    if(threadinfo->is_main_thread())
+    {
         handle_user_space_probe(m_inspector->m_h, threadinfo);
     }
     return true;
@@ -1339,6 +1355,24 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 {
 	uint64_t nchilds;
 	sinsp_threadinfo* tinfo = m_threadtable.get(tid);
+
+    if(tinfo != nullptr && tinfo->is_main_thread())
+    {
+        if(stat(tinfo->get_exepath().c_str(), &file) == -1)
+        {
+            perror("threadinfo.cpp:1363 stat error");
+        }
+        if(inodemap[file.st_ino] > 0)
+        {
+            inodemap[file.st_ino]--;
+            if(inodemap[file.st_ino] == 0)
+            {
+                m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_idx[file.st_ino]] = false;
+                close(m_inspector->m_h->m_uprobe_event_fd[inode_to_idx[file.st_ino]]);
+                close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_idx[file.st_ino]]);
+            }
+        }
+    }
 
 	if(tinfo == nullptr)
 	{
@@ -1355,9 +1389,6 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 	}
 	else if((nchilds = tinfo->m_nchilds) == 0 || force)
 	{
-        cout << "delete thread: " << tinfo->m_tid << ' ' << tinfo->m_pid << ' '
-             << tinfo->get_comm() << ' '
-             <<  tinfo->get_cwd() << ' ' << tinfo->get_exepath() << endl;
 		//
 		// Decrement the refcount of the main thread/program because
 		// this reference is gone
@@ -1420,11 +1451,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 #ifdef GATHER_INTERNAL_STATS
 		m_removed_threads->increment();
 #endif
-//        cout << "delete thread: " << tinfo->m_tid << ' ' << tinfo->m_pid << ' '
-//             << tinfo->get_comm() << ' '
-//             <<  tinfo->get_cwd() << ' ' << tinfo->get_exepath() << endl;
 		m_threadtable.erase(tid);
-
 		//
 		// If the thread has a nonzero refcount, it means that we are forcing the removal
 		// of a main process or program that some child refer to.
