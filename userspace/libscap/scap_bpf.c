@@ -780,10 +780,10 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 
 	}
     if(target_file_path != NULL) {
-        puts("add uprobe successfully:");
-        printf("===event id %d\n",id);
-        printf("===event efd %d\n",efd);
-        printf("===prog fd %d\n",fd);
+//        puts("add uprobe successfully:");
+//        printf("===event id %d\n",id);
+//        printf("===event efd %d\n",efd);
+//        printf("===prog fd %d\n",fd);
         handle->m_uprobe_event_fd[handle->m_uprobe_prog_cnt] = efd;
     }
     else

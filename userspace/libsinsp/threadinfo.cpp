@@ -1297,14 +1297,14 @@ static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo
 
     if(stat(target_file_path, &file) == -1)
     {
-        perror("threadinfo.cpp:1300 stat error");
+        perror("stat error");
         return;
     }
     if(inodemap[file.st_ino] == 0)
     {
 //        cout << "\033[33m" << "handle " << target_file_path << "\033[0m"<< endl ;
         handle_user_space_probe(handle, bpf_probe, true, target_file_path);
-        cout << "\033[0;32;31m" << scap_getlasterr(handle) << "\033[m" << endl;
+//        cout << "\033[0;32;31m" << scap_getlasterr(handle) << "\033[m" << endl;
 
         inode_to_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
     }
@@ -1360,7 +1360,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
     {
         if(stat(tinfo->get_exepath().c_str(), &file) == -1)
         {
-            perror("threadinfo.cpp:1363 stat error");
+            perror("stat error");
         }
         if(inodemap[file.st_ino] > 0)
         {
