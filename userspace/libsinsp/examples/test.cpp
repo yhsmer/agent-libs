@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         sinsp_threadinfo* thread = ev->get_thread_info();
         if(thread)
         {
-//            if(ev->get_type() == PPME_FUN_E){
+//            if(ev->get_type() == PPME_TEST){
 //                cout << ev->get_name() << ' ' << "parameter: " << *((uint32_t *)(ev->get_param_value_raw("parameter"))->m_val) << endl;
 //            }
             string cmdline;

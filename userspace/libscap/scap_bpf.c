@@ -589,7 +589,7 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 			if(err < 0 && errno != 17)
 			{
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to create kprobe '%s' error '%s'\n", event, strerror(errno));
-				return SCAP_FAILURE;
+				return SCAP_UNKNOWN_KPROBE;
 			}
 
 			strcpy(buf, "/sys/kernel/debug/tracing/events/kprobes/");
@@ -738,7 +738,13 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 			}
 
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to open event %s", event);
-			return SCAP_FAILURE;
+			if(is_kprobe || is_kretprobe)
+			{
+				return SCAP_UNKNOWN_KPROBE;
+			}else
+			{
+				return SCAP_FAILURE;
+			}
 		}
 
 		err = read(efd, buf, sizeof(buf));
@@ -774,7 +780,6 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "PERF_EVENT_IOC_SET_BPF: %s", scap_strerror(handle, errno));
 			return SCAP_FAILURE;
 		}
-
 	}
     if(target_file_path != NULL) {
 //        puts("add uprobe successfully:");
@@ -966,7 +971,14 @@ load_prog:
 		   memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
 		   memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0)
 		{
-			if(load_and_attach(handle, shname, data->d_buf, data->d_size, NULL) != SCAP_SUCCESS)
+			res = load_and_attach(handle, shname, data->d_buf, data->d_size, NULL);
+			if((memcmp(shname, "kprobe/", sizeof("kprobe/") - 1) == 0 ||
+			    memcmp(shname, "kretprobe/", sizeof("kretprobe/") - 1) == 0) &&
+			   res == SCAP_UNKNOWN_KPROBE)
+			{
+				continue ;
+			}
+			if(res != SCAP_SUCCESS)
 			{
 				goto cleanup;
 			}

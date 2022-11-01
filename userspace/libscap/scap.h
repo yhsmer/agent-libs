@@ -71,8 +71,9 @@ struct iovec;
 #define SCAP_SUCCESS 0
 #define SCAP_FAILURE 1
 #define SCAP_TIMEOUT -1
-#define SCAP_UPROBE_SKIP -2
-#define SCAP_UPROBE_ARRAY_FULL -3
+#define SCAP_UNKNOWN_KPROBE -2
+#define SCAP_UPROBE_SKIP -3
+#define SCAP_UPROBE_ARRAY_FULL -4
 #define SCAP_ILLEGAL_INPUT 3
 #define SCAP_NOTFOUND 4
 #define SCAP_INPUT_TOO_SMALL 5
@@ -224,6 +225,13 @@ typedef struct scap_fdinfo
 	}info;
 	UT_hash_handle hh; ///< makes this structure hashable
 }scap_fdinfo;
+
+typedef struct pid_vtid_info
+{
+	uint64_t pid_vtid; ///< The id of the process containing this thread. In single thread processes, this is equal to tid.
+	uint64_t tid;
+	UT_hash_handle hh; ///< makes this structure hashable
+}pid_vtid_info;
 
 /*!
   \brief Process information
@@ -1108,6 +1116,8 @@ int32_t scap_set_fullcapture_port_range(scap_t* handle, uint16_t range_start, ui
  */
 int32_t scap_set_statsd_port(scap_t* handle, uint16_t port);
 
+bool put_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t tid, uint64_t vtid);
+uint64_t get_pid_vtid_map(scap_t *handle, uint64_t pid, uint64_t vtid);
 #ifdef __cplusplus
 }
 #endif
