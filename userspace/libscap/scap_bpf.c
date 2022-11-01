@@ -45,10 +45,6 @@ limitations under the License.
 #include "compat/misc.h"
 #include "compat/bpf.h"
 
-#define NONE         "\033[m"
-#define RED          "\033[0;32;31m"
-#define GREEN        "\033[0;32;32m"
-
 
 #ifdef MINIMAL_BUILD
 #undef MINIMAL_BUILD
@@ -604,6 +600,10 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 	}
 	else if(is_uprobe || is_uretprobe)
 	{
+        /*
+         * https://www.kernel.org/doc/Documentation/trace/uprobetracer.txt
+         * uprobe use type BPF_PROG_TYPE_KPROBE
+         */
 		program_type = BPF_PROG_TYPE_KPROBE;
 		if (is_uprobe)
 			event += 7;
@@ -627,11 +627,9 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
             if (err < 0)
             {
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to resolve symbol name '%s' error '%s'\n", func_symbol, strerror(errno));
-//                printf("\033[33m""%s: %s symbol don't exist\n"NONE, target_file_path, func_symbol);
 				return SCAP_UPROBE_SKIP;
 			}
 
-//            printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
             char *identifier = generate_identifier(target_file_path);
 			snprintf(buf, sizeof(buf), "%s%s%s %s:0x%"PRIx64"",
 				 is_uprobe ? "p:" : "r:", event, identifier ,target_file_path, addr);
@@ -659,7 +657,6 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
     if(fd < 0)
 	{
         puts("bpf_load_program fd error");
-//        printf(RED "%s %s\n"NONE, target_file_path, event);
         fprintf(stderr, "%s", error);
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s", errno, event, error);
 		free(error);
@@ -793,14 +790,6 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 
 	return SCAP_SUCCESS;
 }
-
-typedef struct __DATA
-{
-    scap_t *handle;
-    char *shname;
-    void *d_buf;
-    size_t d_size;
-}DATA;
 
 #ifndef MINIMAL_BUILD
 static int32_t load_bpf_file(scap_t *handle, const char *path, bool user_space_probe, const char *target_file_path)
@@ -996,10 +985,12 @@ cleanup:
 
 void __handle_user_space_probe(scap_t *handle, const char *path, bool user_space_probe, const char *target_file_path){
     int res = load_bpf_file(handle, path, user_space_probe, target_file_path);
+    /*
     if(res != SCAP_SUCCESS && res != SCAP_UPROBE_SKIP){
-//        scap_close(handle);
-//        exit(-1);
+        scap_close(handle);
+        exit(-1);
     }
+     */
 }
 
 #endif // MINIMAL_BUILD

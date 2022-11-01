@@ -26,7 +26,6 @@ limitations under the License.
 #include <sys/time.h>
 #endif // _WIN32
 
-#include <iostream>
 #include "scap_open_exception.h"
 #include "sinsp.h"
 #include "sinsp_int.h"
@@ -494,6 +493,7 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 	}
 
 	add_suppressed_comms(oargs);
+
 	int32_t scap_rc;
 	m_h = scap_open(oargs, error, &scap_rc);
 

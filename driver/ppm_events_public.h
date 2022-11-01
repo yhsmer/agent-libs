@@ -985,10 +985,7 @@ enum ppm_event_type {
 	PPME_TCP_RECEIVE_RESET_X = 339,
 	PPME_TCP_SEND_RESET_E = 340,
     PPME_TCP_SEND_RESET_X = 341,
-    PPME_FUN_E = 342,
-    PPME_FUN_X = 343,
-    PPME_GRPC_E = 344,
-    PPM_EVENT_MAX = 345
+    PPM_EVENT_MAX = 342
 };
 /*@}*/
 

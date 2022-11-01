@@ -82,7 +82,6 @@ int main(int argc, char **argv)
     signal(SIGPIPE, sigint_handler);
 
     inspector.open();
-    scap_t* scap_test = inspector.getScap_t();
     if(!filter_string.empty())
     {
         try

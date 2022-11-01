@@ -33,7 +33,6 @@ limitations under the License.
 #include "protodecoder.h"
 #include "tracers.h"
 
-
 #ifdef HAS_ANALYZER
 #include "tracer_emitter.h"
 #endif

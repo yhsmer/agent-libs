@@ -1282,12 +1282,6 @@ protected:
 		m_network_interfaces = value;
 	}
 #endif // SYSDIG_TEST
-
-public:
-    // scap_t* m_h;
-    scap_t* getScap_t(){
-        return m_h;
-    }
 };
 
 /*@}*/

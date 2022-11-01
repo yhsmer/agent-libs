@@ -78,38 +78,6 @@ int bpf_up_##event(struct pt_regs *ctx)
 __bpf_section(URET_NAME #event ":" #func_symbol)			\
 int bpf_uret_##event(struct pt_regs *ctx)
 
-
-BPF_UPROBE(fun, main.fun)
-{
-    bpf_printk("============== hit fun uprobe\n");
-    struct sysdig_bpf_settings *settings;
-    enum ppm_event_type evt_type;
-    settings = get_bpf_settings();
-    if (!settings)
-        return 0;
-
-    evt_type = PPME_FUN_E;
-    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-        bpf_fun_uprobe_e(ctx);
-    }
-    return 0;
-}
-
-BPF_URET_PROBE(uret_fun, fun)
-{
-    struct sysdig_bpf_settings *settings;
-    enum ppm_event_type evt_type;
-    settings = get_bpf_settings();
-    if (!settings)
-        return 0;
-
-    evt_type = PPME_FUN_X;
-    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-        bpf_fun_uprobe_x(ctx);
-    }
-    return 0;
-}
-
 BPF_PROBE("raw_syscalls/", sys_enter, sys_enter_args)
 {
 	const struct syscall_evt_pair *sc_evt;
@@ -387,7 +355,6 @@ BPF_PROBE("net/", netif_receive_skb, netif_receive_skb_args)
 }
 */
 
-
 BPF_KPROBE(tcp_drop)
 {
 	struct sysdig_bpf_settings *settings;
@@ -625,44 +592,6 @@ BPF_PROBE("tcp/", tcp_receive_reset, tcp_reset_args){
 }
 #endif
 
-BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader)
-{
-    struct sysdig_bpf_settings *settings;
-    enum ppm_event_type evt_type;
-    settings = get_bpf_settings();
-    if (!settings)
-        return 0;
-
-    evt_type = PPME_GRPC_E;
-    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-        bpf_probe_loopy_writer_write_header_e(ctx);
-    }
-    return 0;
-}
-
-BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
-{
-    bpf_printk("probe_http2_server_operate_headers\n");
-    return 0;
-}
-
-BPF_UPROBE(probe_hpack_header_encoder, golang.org/x/net/http2/hpack.(*Encoder).WriteField)
-{
-    bpf_printk("probe_hpack_header_encoder\n");
-    return 0;
-}
-
-BPF_UPROBE(probe_http2_framer_check_frame_order, golang.org/x/net/http2.(*Framer).checkFrameOrder)
-{
-    bpf_printk("probe_http2_framer_check_frame_order\n");
-    return 0;
-}
-
-BPF_UPROBE(probe_http2_framer_write_data, golang.org/x/net/http2.(*Framer).WriteDataPadded)
-{
-    bpf_printk("probe_http2_framer_write_data\n");
-    return 0;
-}
 
 char kernel_ver[] __bpf_section("kernel_version") = UTS_RELEASE;
 
