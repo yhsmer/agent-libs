@@ -668,6 +668,10 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
     {
         int cnt = 0;
         // find an array space to store uprobe fd and pmc fd
+        if(handle->m_uprobe_prog_cnt == 0)
+        {
+            handle->m_uprobe_prog_cnt++;
+        }
         while(handle->m_uprobe_array_idx_is_used[handle->m_uprobe_prog_cnt] == true)
         {
             handle->m_uprobe_prog_cnt = (handle->m_uprobe_prog_cnt + 1) % BPF_PROGS_MAX;
@@ -676,6 +680,10 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
             {
                 snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "handle->m_uprobe_prog_fds[] is full, please enlarge the size of m_uprobe_prog_fds[] and m_uprobe_event_fd[]");
                 return SCAP_FAILURE;
+            }
+            if(handle->m_uprobe_prog_cnt == 0)
+            {
+                handle->m_uprobe_prog_cnt++;
             }
         }
 
@@ -781,11 +789,8 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 			return SCAP_FAILURE;
 		}
 	}
-    if(target_file_path != NULL) {
-//        puts("add uprobe successfully:");
-//        printf("===event id %d\n",id);
-//        printf("===event efd %d\n",efd);
-//        printf("===prog fd %d\n",fd);
+    if(target_file_path != NULL)
+    {
         handle->m_uprobe_event_fd[handle->m_uprobe_prog_cnt] = efd;
     }
     else

@@ -112,8 +112,8 @@ int main(int argc, char **argv)
         sinsp_threadinfo* thread = ev->get_thread_info();
         if(thread)
         {
-//            if(ev->get_type() == PPME_TEST){
-//                cout << ev->get_name() << ' ' << "parameter: " << *((uint32_t *)(ev->get_param_value_raw("parameter"))->m_val) << endl;
+//            if(ev->get_type() == PPME_UPROBE){
+//                cout << ev->get_name() << ' ' << "value: " << *((uint32_t *)(ev->get_param_value_raw("value"))->m_val) << endl;
 //            }
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);
