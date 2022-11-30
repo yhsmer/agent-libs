@@ -25,6 +25,7 @@ limitations under the License.
 #include <algorithm>
 #include <map>
 #include <string>
+#include <cstdio>
 #include <sys/stat.h>
 #include "sinsp.h"
 #include "scap.h"
@@ -37,11 +38,17 @@ limitations under the License.
 #include "tracer_emitter.h"
 #endif
 
+// agent-libs running in container in production environment
+// the elf path differs in host and container
+// define HOST_MODE allows you to run agent-libs on the host;
+#define HOST_MODE
+
 extern sinsp_evttables g_infotables;
 static const char *bpf_probe;
-struct stat file;
 unordered_map<unsigned long long, int> inodemap;
 unordered_map<int, int> inode_to_idx;
+// tranform container path to host path
+unordered_map<string, string> hostpath;
 
 static void copy_ipv6_address(uint32_t* dest, uint32_t* src)
 {
@@ -1266,6 +1273,39 @@ void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* thr
 	}
 }
 
+void get_container_path(char *container_path, char *container_id){
+    // TODO(yhsmer): may have better solution
+    static char command[100] = "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' ";
+    // len{ "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' " } = 58
+    command[58] = '\0';
+    strcat(command, container_id);
+
+    FILE *pp = popen(command, "r"); // build pipe
+    if (!pp)
+        return;
+
+    // collect cmd execute result
+    while (fgets(container_path, 1024, pp) != NULL){}
+
+    pclose(pp);
+    container_path[strlen(container_path) - 1] = '\0';
+}
+
+void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* file_path_from_proc){
+    static char container_path[1024];
+    static char container_id[20];
+
+    if(!threadinfo->m_container_id.empty())
+    {
+        // process running in a container
+        strcpy(container_id, threadinfo->m_container_id.c_str());
+        get_container_path(container_path, container_id);
+
+        strcat(target_file_path, container_path);
+
+    }
+    strcat(target_file_path, file_path_from_proc);
+}
 
 static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo){
     if(!bpf_probe)
@@ -1278,33 +1318,47 @@ static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo
         return;
     }
 
-    static char target_file_path[1024] = {0};
+    // /host popen(/var/lib/..../merged) file_path(/home/a.out)
     static char proc_path[20] = {0};
+    static char file_path_from_proc[2014] = {0};
+    static char target_file_path[1024] = {0};
+    struct stat file;
+
     sprintf(proc_path, "/proc/%ld/exe", threadinfo->m_pid);
 
     static long buf_len;
-    if((buf_len = readlink(proc_path, target_file_path,1024)) <=0)
+    if((buf_len = readlink(proc_path, file_path_from_proc,1024)) <=0)
     {
         return;
     }
-    target_file_path[buf_len] = '\0';
+    file_path_from_proc[buf_len] = '\0';
 
-    if(strlen(target_file_path) == 0)
+    if(strlen(file_path_from_proc) == 0)
     {
         return;
     }
+
+#ifdef HOST_MODE
+    // debug mode;
+    target_file_path[0] = '\0';
+#else
+    // in production environment
+    target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
+    target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
+#endif
+
+    to_host_path(target_file_path, threadinfo, file_path_from_proc);
 
     if(stat(target_file_path, &file) == -1)
     {
-        perror("stat error");
+        cout << "stat error file_path: " << target_file_path << endl;
+        perror("stat error(add_thread: handle_user_space_probe)");
         return;
     }
     if(inodemap[file.st_ino] == 0)
     {
-//        cout << "\033[33m" << "handle " << target_file_path << "\033[0m"<< endl ;
+        //TODO(yhsmer): if handle_user_space_probe return false, the file does not have any our hook func, can be marked as -1
         handle_user_space_probe(handle, bpf_probe, true, target_file_path);
-//        cout << "\033[0;32;31m" << scap_getlasterr(handle) << "\033[m" << endl;
-
         inode_to_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
     }
     inodemap[file.st_ino]++;
@@ -1354,21 +1408,36 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 {
 	uint64_t nchilds;
 	sinsp_threadinfo* tinfo = m_threadtable.get(tid);
+    static struct stat file;
 
     if(tinfo != nullptr && tinfo->is_main_thread())
     {
-        if(stat(tinfo->get_exepath().c_str(), &file) == -1)
+        static char target_file_path[1024] = {0};
+#ifdef HOST_MODE
+        // debug mode;
+        target_file_path[0] = '\0';
+#else
+        // in production environment
+    target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
+    target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
+#endif
+
+        to_host_path(target_file_path, tinfo, (char*)tinfo->get_exepath().c_str());
+
+        if(stat(target_file_path, &file) == -1)
         {
-            perror("stat error");
+            cout << "stat error file_path(remove_thread): " << target_file_path << endl;
+            perror("stat error(remove_thread)");
         }
-        if(inodemap[file.st_ino] > 0)
+        else if(inodemap[file.st_ino] > 0)
         {
+//            cout << "inodemap（remove）: " << target_file_path << " " << file.st_ino << " "<< inode_to_idx[file.st_ino] << endl;
             inodemap[file.st_ino]--;
-            if(inodemap[file.st_ino] == 0)
+            if(inode_to_idx[file.st_ino] != 0 && inodemap[file.st_ino] == 0)
             {
-                m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_idx[file.st_ino]] = false;
-                close(m_inspector->m_h->m_uprobe_event_fd[inode_to_idx[file.st_ino]]);
-                close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_idx[file.st_ino]]);
+                    m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_idx[file.st_ino]] = false;
+                    close(m_inspector->m_h->m_uprobe_event_fd[inode_to_idx[file.st_ino]]);
+                    close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_idx[file.st_ino]]);
             }
         }
     }
