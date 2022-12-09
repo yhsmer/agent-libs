@@ -4931,7 +4931,11 @@ static __always_inline int __bpf_cpu_analysis(struct filler_data *data, u32 tid)
 {
     int res;
     struct info_t *infop = bpf_map_lookup_elem(&cpu_records, &tid);
-    if (infop == 0)
+	// TODO(yexm): 
+	// test.exe-15554 [001] d...  6168.721180: p_finish_task_switch: (finish_task_switch+0x0/0x1c0)
+    // test.exe-15554 [001] ....  6168.721462: sched_process_exit: comm=test.exe pid=15554 prio=120
+	//  || infop->index == 0
+	if (infop == 0)
         return 0;
 
     // {"start_ts", PT_ABSTIME, PF_DEC},
