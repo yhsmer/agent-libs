@@ -113,24 +113,6 @@ int main(int argc, char **argv)
         sinsp_threadinfo* thread = ev->get_thread_info();
         if(thread)
         {
-            if(ev->get_type() == PPME_CPU_ANALYSIS_E){
-                uint64_t s = *((uint64_t *)(ev->get_param_value_raw("start_ts"))->m_val);
-                uint64_t e = *((uint64_t *)(ev->get_param_value_raw("end_ts"))->m_val);
-                cout << ev->get_name() << ": " 
-                    << "tid: " << ev->get_tid() << ' '
-                    << "start_ts: " << *((uint64_t *)(ev->get_param_value_raw("start_ts"))->m_val) << " "
-                    << "end_ts  : " << *((uint64_t *)(ev->get_param_value_raw("end_ts"))->m_val) << " "
-                    << "cnt: " << *((uint32_t *)(ev->get_param_value_raw("cnt"))->m_val) << " ";
-                    char *time_specs = (ev->get_param_value_raw("time_specs"))->m_val;
-                    char *runq_latency = (ev->get_param_value_raw("runq_latency"))->m_val;
-                    char *time_type = (ev->get_param_value_raw("time_type"))->m_val;
-                cout << time_specs << ' ' << runq_latency << ' ' << time_type << ' ';
-                if( (e - s) / 1000000000 == 3) {
-                    cout << "hit";
-                }
-                cout << endl;
-            }
-            // print_event(ev);
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);
 
