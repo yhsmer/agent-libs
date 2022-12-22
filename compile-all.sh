@@ -2,7 +2,7 @@
 set -e
 set -x
 cd /root/code/cc/cpu/agent-libs/build
-cmake -DBUILD_LIBSCAP_EXAMPLES=OFF -DMINIMAL_BUILD=ON -DCREATE_TEST_TARGETS=OFF -DBUILD_LIBSINSP_EXAMPLES=ON ..
+#cmake -DBUILD_LIBSCAP_EXAMPLES=OFF -DMINIMAL_BUILD=ON -DCREATE_TEST_TARGETS=OFF -DBUILD_LIBSINSP_EXAMPLES=ON ..
 make
 cd /root/code/cc/cpu/agent-libs/driver/bpf
 make

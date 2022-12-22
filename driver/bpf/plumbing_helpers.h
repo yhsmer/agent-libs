@@ -193,7 +193,7 @@ static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_
 
 	if (infop != 0) {
 		int offset_ts = infop->end_ts - infop->start_ts;
-		if (infop->index > 0 && (infop->index == switch_agg_num || offset_ts > 2000000000)) {
+		if (infop->index > 0 && (infop->index == switch_agg_num - 1 || infop->index == switch_agg_num || offset_ts > 2000000000)) {
 		//bpf_printk("start_ts %llu", infop->start_ts);
 			// perf out
 			if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
