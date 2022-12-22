@@ -57,6 +57,7 @@ static __always_inline void clear_map(u32 tid)
 	bpf_map_delete_elem(&type_map, &tid);
 	bpf_map_delete_elem(&on_start_ts, &tid);
 	bpf_map_delete_elem(&off_start_ts, &tid);
+	bpf_map_delete_elem(&cpu_focus_threads, &tid);
 //    bpf_map_delete_elem(&aggregate_time, &tid);
 	bpf_map_delete_elem(&cpu_records, &tid);
 }
@@ -131,7 +132,7 @@ static __always_inline enum offcpu_type get_syscall_type(int syscall_id) {
 	return type;
 }
 
-static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 latency, u64 delta, u8 is_on)
+static __always_inline void record_cpu_offtime(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 latency, u64 delta)
 {
 	uint16_t switch_agg_num = settings->switch_agg_num;
 	struct info_t *infop;
@@ -150,18 +151,16 @@ static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings
 	if (infop != 0) {
 		if (infop->index < switch_agg_num) {
 			infop->times_specs[infop->index & (NUM - 1)] = delta;
-			if (is_on == 0) {
-				// get the type of offcpu
-				enum offcpu_type *typep, type;
-				typep = bpf_map_lookup_elem(&type_map, &tid);
-				if (typep == 0) {
-					type = OTHER;
-				} else {
-					type = *typep;
-				}
-				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-				infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
+			// get the type of offcpu
+			enum offcpu_type *typep, type;
+			typep = bpf_map_lookup_elem(&type_map, &tid);
+			if (typep == 0) {
+				type = OTHER;
+			} else {
+				type = *typep;
 			}
+			infop->time_type[infop->index & (NUM - 1)] = (u8)type;
+			infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
 			infop->index++;
 		}
 		// update end_ts
@@ -171,7 +170,7 @@ static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings
 	}
 }
 
-static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta, u8 is_on)
+static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta)
 {
 	uint16_t switch_agg_num = settings->switch_agg_num;
 	struct info_t *infop;
@@ -188,37 +187,37 @@ static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_
 	}
 
 	if (infop != 0) {
+		enum offcpu_type *typep, type;
+		// get the type of offcpu
+		typep = bpf_map_lookup_elem(&type_map, &tid);
+		if (infop->index < switch_agg_num) {
+			infop->times_specs[infop->index & (NUM - 1)] = delta;
+			infop->index++;
+		}
+		// update end_ts
+		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
+		u64 *focus_time = bpf_map_lookup_elem(&cpu_focus_threads, &tid);
+
 		int offset_ts = infop->end_ts - infop->start_ts;
-		if (infop->index > 0 && (infop->index == switch_agg_num - 1 || infop->index == switch_agg_num || offset_ts > 2000000000)) {
-		//bpf_printk("start_ts %llu", infop->start_ts);
+		bool have_focus_events = false;
+		if(focus_time){
+		 	u64 ftime = settings->boot_time + *focus_time;
+		 	if(ftime > start_ts && ftime < start_ts + delta) have_focus_events = true;
+		}
+		if (infop->index > 0 && (have_focus_events
+			|| infop->index == switch_agg_num || infop->index == switch_agg_num - 1 || offset_ts > 2000000000)) {
+			//bpf_printk("start_ts %llu", infop->start_ts);
 			// perf out
 			if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
 				bpf_cpu_analysis(ctx, infop->tid);
 			}
 			// clear
-			infop->start_ts = settings->boot_time + start_ts;
+			infop->start_ts = infop->end_ts;
 			infop->index = 0;
 			memset(infop->time_type, 0, sizeof(infop->time_type));
 			memset(infop->times_specs, 0, sizeof(infop->times_specs));
 			memset(infop->rq, 0, sizeof(infop->rq));
 		}
-		if (infop->index < switch_agg_num) {
-			infop->times_specs[infop->index & (NUM - 1)] = delta;
-			if (is_on == 0) {
-				// get the type of offcpu
-				enum offcpu_type *typep, type;
-				typep = bpf_map_lookup_elem(&type_map, &tid);
-				if (typep == 0) {
-					type = OTHER;
-				} else {
-					type = *typep;
-				}
-				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-			}
-			infop->index++;
-		}
-		// update end_ts
-		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
 		// cache
 		bpf_map_update_elem(&cpu_records, &tid, infop, BPF_ANY);
 	}
@@ -317,7 +316,7 @@ static __always_inline long bpf_syscall_get_nr(void *ctx)
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
 	struct pt_regs *regs = (struct pt_regs *)args->regs;
 
-	id = _READ(regs->orig_ax);
+	id = _READ(PT_REGS_CALLNO(regs));
 #else
 	id = args->id;
 #endif
@@ -351,22 +350,22 @@ static __always_inline unsigned long bpf_syscall_get_argument_from_ctx(void *ctx
 
 	switch (idx) {
 	case 0:
-		arg = _READ(regs->di);
+		arg = _READ(PT_REGS_PARAM1(regs));
 		break;
 	case 1:
-		arg = _READ(regs->si);
+		arg = _READ(PT_REGS_PARAM2(regs));
 		break;
 	case 2:
-		arg = _READ(regs->dx);
+		arg = _READ(PT_REGS_PARAM3(regs));
 		break;
 	case 3:
-		arg = _READ(regs->r10);
+		arg = _READ(PT_REGS_PARAM4(regs));
 		break;
 	case 4:
-		arg = _READ(regs->r8);
+		arg = _READ(PT_REGS_PARAM5(regs));
 		break;
 	case 5:
-		arg = _READ(regs->r9);
+		arg = _READ(PT_REGS_PARAM6(regs));
 		break;
 	default:
 		arg = 0;
