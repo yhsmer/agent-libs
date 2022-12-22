@@ -240,7 +240,7 @@ BPF_PROBE("sched/", sched_switch, sched_switch_args)
 			bpf_map_delete_elem(&on_start_ts, &tid);
 			if ((delta_us >= MINBLOCK_US) && (delta_us <= MAXBLOCK_US)) {
 				if (check_filter(pid)) {
-					record_cputime_and_out(ctx, settings, pid, tid, *on_ts, NULL, delta, 1);
+					record_cputime_and_out(ctx, settings, pid, tid, *on_ts, delta, 1);
 					// aggregate(pid, tid, *on_ts, delta, 1);
 				}
 			}
@@ -316,8 +316,7 @@ BPF_KPROBE(finish_task_switch)
 			bpf_map_delete_elem(&on_start_ts, &tid);
 			if ((delta_us >= MINBLOCK_US) && (delta_us <= MAXBLOCK_US)) {
 				if (check_filter(pid)) {
-					record_cputime(ctx, settings, pid, tid, *on_ts, NULL, delta, 1);
-					//record_cputime_and_out(ctx, settings, pid, tid, *on_ts, delta, 1);
+					record_cputime_and_out(ctx, settings, pid, tid, *on_ts, delta, 1);
 					// aggregate(pid, tid, *on_ts, delta, 1);
 				}
 			}
@@ -352,8 +351,7 @@ BPF_KPROBE(finish_task_switch)
 						rq_la = (on_ts - *rq_ts) / 1000;
 					bpf_map_delete_elem(&cpu_runq, &tid);
 				}
-				//record_cputime(ctx, settings, pid, tid, off_ts, rq_la, delta, 0);
-				record_cputime_and_out(ctx, settings, pid, tid, off_ts, rq_la, delta, 0);
+				record_cputime(ctx, settings, pid, tid, off_ts, rq_la, delta, 0);
 				// aggregate(pid, tid, off_ts, delta, 0);
 			}
 		}

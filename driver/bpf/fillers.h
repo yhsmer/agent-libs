@@ -4931,11 +4931,7 @@ static __always_inline int __bpf_cpu_analysis(struct filler_data *data, u32 tid)
 {
     int res;
     struct info_t *infop = bpf_map_lookup_elem(&cpu_records, &tid);
-	// TODO(yexm): 
-	// test.exe-15554 [001] d...  6168.721180: p_finish_task_switch: (finish_task_switch+0x0/0x1c0)
-    // test.exe-15554 [001] ....  6168.721462: sched_process_exit: comm=test.exe pid=15554 prio=120
-	//  || infop->index == 0
-	if (infop == 0)
+	if (infop == 0 || infop->index == 0)
         return 0;
 
     // {"start_ts", PT_ABSTIME, PF_DEC},
@@ -4972,6 +4968,12 @@ static __always_inline int bpf_cpu_analysis(void *ctx, u32 tid)
     if (res == PPM_SUCCESS) {
         if (!data.state->tail_ctx.len)
             write_evt_hdr(&data);
+		
+		#ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
+		struct ppm_evt_hdr *evt_hdr = (struct ppm_evt_hdr *)data.buf;
+		evt_hdr->tid = tid;
+		#endif
+
         res = __bpf_cpu_analysis(&data, tid);
     }
 

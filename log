@@ -1,6 +1,0 @@
-[  8%] Built target tbb
-[ 16%] Built target b64
-[ 24%] Built target jq
-[ 41%] Built target scap
-[ 41%] Built target driver
-[ 42%] Building CXX object libsinsp/CMakeFiles/sinsp.dir/event.cpp.o

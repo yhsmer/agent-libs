@@ -160,11 +160,7 @@ static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings
 					type = *typep;
 				}
 				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-				
-				#ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
 				infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
-				#endif
-
 			}
 			infop->index++;
 		}
@@ -175,7 +171,7 @@ static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings
 	}
 }
 
-static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 latency, u64 delta, u8 is_on)
+static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta, u8 is_on)
 {
 	uint16_t switch_agg_num = settings->switch_agg_num;
 	struct info_t *infop;
@@ -218,11 +214,6 @@ static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_
 					type = *typep;
 				}
 				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-
-				#ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
-				infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
-				#endif
-
 			}
 			infop->index++;
 		}

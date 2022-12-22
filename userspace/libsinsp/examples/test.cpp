@@ -26,7 +26,6 @@ using namespace std;
 
 static bool g_interrupted;
 static const uint8_t g_backoff_timeout_secs = 2; 
-sinsp_evt_formatter* formatter = nullptr;
 
 static void sigint_handler(int signum)
 {
@@ -49,17 +48,6 @@ Options:
 //   "evt.category=process or evt.category=net"
 //   "evt.dir=< and (evt.category=net or (evt.type=execveat or evt.type=execve or evt.type=clone or evt.type=fork or evt.type=vfork))"
 // 
-
-void print_event(sinsp_evt* s_evt) {
-  if (true) {
-    string line;
-    cout << "print_event\n";
-    if (formatter->tostring(s_evt, &line)) {
-      cout << line << endl;
-    }
-  }
-}
-
 int main(int argc, char **argv)
 {
     sinsp inspector;
