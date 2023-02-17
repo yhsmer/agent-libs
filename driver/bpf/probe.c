@@ -29,29 +29,6 @@ or GPL2.txt for full copies of the license.
 #include <uapi/linux/tcp.h>
 #include <uapi/linux/udp.h>
 
-/*
-## 表示连接
-int bpf_##event -> int bpf_${event}
-
-# 表示加双引号
-#event -> "${event}"
-
-types.h
-#ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
-#define TP_NAME "raw_tracepoint/"
-#else
-#define TP_NAME "tracepoint/"
-#endif
-
-# 表示编译到名为NAME的section中
-#define __bpf_section(NAME) __attribute__((section(NAME), used))
-
-
-# C特性字符串会自动合并（cout一样合并），__bpf_section("1" "2" "3") -> __bpf_section("123")
-__bpf_section(TP_NAME prefix #event)
-
-*/
-
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
 #define BPF_PROBE(prefix, event, type)			\
 __bpf_section(TP_NAME #event)				\

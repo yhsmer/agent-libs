@@ -25,4 +25,3 @@ driver/driver_config.h
 build*
 .idea/
 cmake-build-debug/
-cmake-build-debug-remote-host/

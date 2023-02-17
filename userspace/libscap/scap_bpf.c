@@ -78,9 +78,6 @@ static const char *g_filler_names[PPM_FILLER_MAX] = {
 
 static int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr, unsigned int size)
 {
-	// syscall执行系统调用，cmd表示执行的指令
-	// cmd：BPF_MAP_CREATE 表示创建map
-	// cmd: BPF_PROG_LOAD 表示将BPF代码加载进内核
 	return syscall(__NR_bpf, cmd, attr, size);
 }
 
@@ -278,7 +275,7 @@ static uint32_t bpf_load_program(const struct bpf_insn *insns,
 	attr.log_size = log_buf_sz;
 	attr.log_level = 1;
 	log_buf[0] = 0;
-	// 执行系统调用，命令BPF_PROG_LOAD表示将BPF代码加载进内核
+
 	return sys_bpf(BPF_PROG_LOAD, &attr, sizeof(attr));
 }
 
@@ -575,8 +572,6 @@ static int32_t load_and_attach(scap_t* handle, const char *event, struct bpf_ins
 	{
 		program_type = BPF_PROG_TYPE_KPROBE;
 		if(is_kprobe)
-			// 设置+7表示去除kprobe/前缀，
-			// eg: event = 12345 , +3 -> event = 45
 			event += 7;
 		else
 			event += 10;
