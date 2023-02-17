@@ -4775,7 +4775,7 @@ KP_FILLER(tcp_retransmit_skb_kprobe_e)
 
 KP_FILLER(tcp_connect_kprobe_x)
 {
-    struct pt_regs *args = (struct pt_regs*)data->ctx;
+	struct pt_regs *args = (struct pt_regs*)data->ctx;
 	int retval = 0;
 	retval= regs_return_value(args);
 	unsigned long long id = bpf_get_current_pid_tgid() & 0xffffffff;

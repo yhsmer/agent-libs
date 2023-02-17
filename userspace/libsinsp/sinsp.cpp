@@ -876,8 +876,8 @@ void sinsp::on_new_entry_from_proc(void* context,
 		}
 
 		if (!thread_added) {
-            delete newti;
-        }
+			delete newti;
+		}
 	}
 	else
 	{

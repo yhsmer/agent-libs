@@ -163,10 +163,10 @@ struct scap
 		int m_bpf_event_fd[BPF_PROGS_MAX];
 		int m_bpf_map_fds[BPF_MAPS_MAX];
 
-        int m_uprobe_prog_fds[BPF_PROGS_MAX];
-        int m_uprobe_event_fd[BPF_PROGS_MAX];
-        bool m_uprobe_array_idx_is_used[BPF_PROGS_MAX];
-        int m_uprobe_prog_cnt;
+		int m_uprobe_prog_fds[BPF_PROGS_MAX];
+		int m_uprobe_event_fd[BPF_PROGS_MAX];
+		bool m_uprobe_array_idx_is_used[BPF_PROGS_MAX];
+		int m_uprobe_prog_cnt;
 
 		int m_bpf_prog_array_map_idx;
 	};
