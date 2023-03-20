@@ -31,7 +31,6 @@ or GPL2.txt for full copies of the license.
             bpf_probe_read((void *)dst, size, (char *)ctx + __offset);		\
         } while (0);
 
-//#define BPF_DEBUG
 #ifdef BPF_DEBUG
 #define bpf_printk(fmt, ...)					\
 	do {							\
@@ -52,14 +51,14 @@ static __always_inline bool prepare_filler(void *ctx,
 					   enum ppm_event_type evt_type,
 					   struct sysdig_bpf_settings *settings,
 					   enum syscall_flags drop_flags);
-static __always_inline int bpf_cpu_analysis(void *ctx, u32 tid);
 #ifdef CPU_ANALYSIS
+static __always_inline int bpf_cpu_analysis(void *ctx, u32 tid);
 static __always_inline void clear_map(u32 tid)
 {
 	bpf_map_delete_elem(&type_map, &tid);
 	bpf_map_delete_elem(&on_start_ts, &tid);
 	bpf_map_delete_elem(&off_start_ts, &tid);
-//    bpf_map_delete_elem(&aggregate_time, &tid);
+	bpf_map_delete_elem(&cpu_focus_threads, &tid);
 	bpf_map_delete_elem(&cpu_records, &tid);
 }
 
@@ -132,111 +131,33 @@ static __always_inline enum offcpu_type get_syscall_type(int syscall_id) {
 	bpf_map_update_elem(&syscall_map, &syscall_id, &type, BPF_ANY);
 	return type;
 }
-
-static __always_inline void record_cputime(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 latency, u64 delta, u8 is_on)
+static __always_inline struct info_t* get_cpu_info(u32 pid, u32 tid, u64 real_start_ts)
 {
 	struct info_t *infop;
 	infop = bpf_map_lookup_elem(&cpu_records, &tid);
-	if (infop == 0) { // try init
+	if (infop == 0) {
 		// init
 		struct info_t info = {0};
 		info.pid = pid;
 		info.tid = tid;
-		info.start_ts = settings->boot_time + start_ts;
+		info.start_ts = real_start_ts;
 		info.index = 0;
 		bpf_map_update_elem(&cpu_records, &tid, &info, BPF_ANY);
 		infop = bpf_map_lookup_elem(&cpu_records, &tid);
 	}
 
-	if (infop != 0) {
-		if (infop->index < NUM) {
-			infop->times_specs[infop->index & (NUM - 1)] = delta;
-			if (is_on == 0) {
-				// get the type of offcpu
-				enum offcpu_type *typep, type;
-				typep = bpf_map_lookup_elem(&type_map, &tid);
-				if (typep == 0) {
-					type = OTHER;
-				} else {
-					type = *typep;
-				}
-				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-				infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
-			}
-			infop->index++;
-		}
-		// update end_ts
-		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
-		// cache
-		bpf_map_update_elem(&cpu_records, &tid, infop, BPF_ANY);
-	}
+	return infop;
 }
 
-static __always_inline void record_cputime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta, u8 is_on)
+static __always_inline void record_cpu_offtime(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 latency, u64 delta)
 {
-	struct info_t *infop;
-	infop = bpf_map_lookup_elem(&cpu_records, &tid);
-	if (infop == 0) { // try init
-		// init
-		struct info_t info = {0};
-		info.pid = pid;
-		info.tid = tid;
-		info.start_ts = settings->boot_time + start_ts;
-		info.index = 0;
-		bpf_map_update_elem(&cpu_records, &tid, &info, BPF_ANY);
-		infop = bpf_map_lookup_elem(&cpu_records, &tid);
-	}
+	uint16_t switch_agg_num = settings->switch_agg_num;
+	struct info_t *infop = get_cpu_info(pid, tid, settings->boot_time + start_ts);
 
 	if (infop != 0) {
-	int offset_ts = infop->end_ts - infop->start_ts;
-		if (infop->index > 0 && (infop->index == NUM || offset_ts > 2000000000)) {
-		//bpf_printk("start_ts %llu", infop->start_ts);
-			// perf out
-			if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
-				bpf_cpu_analysis(ctx, infop->tid);
-			}
-			// clear
-			infop->start_ts = settings->boot_time + start_ts;
-			infop->index = 0;
-			memset(infop->time_type, 0, sizeof(infop->time_type));
-			memset(infop->times_specs, 0, sizeof(infop->times_specs));
-			memset(infop->rq, 0, sizeof(infop->rq));
-		}
-		if (infop->index < NUM) {
+		if (infop->index < switch_agg_num) {
 			infop->times_specs[infop->index & (NUM - 1)] = delta;
-			if (is_on == 0) {
-				// get the type of offcpu
-				enum offcpu_type *typep, type;
-				typep = bpf_map_lookup_elem(&type_map, &tid);
-				if (typep == 0) {
-					type = OTHER;
-				} else {
-					type = *typep;
-				}
-				infop->time_type[infop->index & (NUM - 1)] = (u8)type;
-			}
-			infop->index++;
-		}
-		// update end_ts
-		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
-		// cache
-		bpf_map_update_elem(&cpu_records, &tid, infop, BPF_ANY);
-	}
-}
-
-static __always_inline void aggregate(u32 pid, u32 tid, u64 start_time, u64 current_interval, bool is_on)
-{
-	struct time_aggregate_t* p_time = bpf_map_lookup_elem(&aggregate_time, &pid);
-	if (p_time == 0) {
-		struct time_aggregate_t time_aggregate = {};
-		time_aggregate.start_time = start_time;
-		bpf_map_update_elem(&aggregate_time, &pid, &time_aggregate, BPF_ANY);
-		p_time = bpf_map_lookup_elem(&aggregate_time, &pid);
-	}
-	if (p_time != 0) {
-		if (is_on) {
-			p_time->total_times[0] += current_interval;
-		} else {
+			// get the type of offcpu
 			enum offcpu_type *typep, type;
 			typep = bpf_map_lookup_elem(&type_map, &tid);
 			if (typep == 0) {
@@ -244,10 +165,53 @@ static __always_inline void aggregate(u32 pid, u32 tid, u64 start_time, u64 curr
 			} else {
 				type = *typep;
 			}
-			p_time->total_times[1] += current_interval;
-			p_time->time_specs[((int)type - 1) & (TYPE_NUM - 1)] += current_interval;
+			infop->time_type[infop->index & (NUM - 1)] = (u8)type;
+			infop->rq[(infop->index / 2) & (HALF_NUM - 1)] = latency;
+			infop->index++;
 		}
-		bpf_map_update_elem(&aggregate_time, &pid, p_time, BPF_ANY);
+		// update end_ts
+		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
+	}
+}
+
+static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta)
+{
+	uint16_t switch_agg_num = settings->switch_agg_num;
+	struct info_t *infop = get_cpu_info(pid, tid, start_ts);
+
+	if (infop != 0) {
+		if (infop->index < switch_agg_num) {
+			infop->times_specs[infop->index & (NUM - 1)] = delta;
+			infop->index++;
+		}
+		// update end_ts
+		infop->end_ts = settings->boot_time + bpf_ktime_get_ns();
+		int offset_ts = infop->end_ts - infop->start_ts;
+
+		u64 *focus_time = bpf_map_lookup_elem(&cpu_focus_threads, &tid);
+		bool have_focus_events = false;
+		if (focus_time) {
+		 	if (*focus_time > start_ts && *focus_time < start_ts + delta) have_focus_events = true;
+		}
+
+		/* Some situations will trigger perf out:
+		   1. have focused events, e.g. net events
+		   2. the times of task switches reach at a specfic number
+		   3. the time range of task switches (namely offset_ts) exceeds threshold
+		*/
+		if (infop->index > 0 && (have_focus_events
+			|| infop->index == switch_agg_num || infop->index == switch_agg_num - 1 || offset_ts > 2000000000)) {
+			// perf out
+			if (prepare_filler(ctx, ctx, PPME_CPU_ANALYSIS_E, settings, 0)) {
+				bpf_cpu_analysis(ctx, infop->tid);
+			}
+			// clear
+			infop->start_ts = infop->end_ts;
+			infop->index = 0;
+			memset(infop->time_type, 0, sizeof(infop->time_type));
+			memset(infop->times_specs, 0, sizeof(infop->times_specs));
+			memset(infop->rq, 0, sizeof(infop->rq));
+		}
 	}
 }
 #endif
@@ -317,7 +281,7 @@ static __always_inline long bpf_syscall_get_nr(void *ctx)
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
 	struct pt_regs *regs = (struct pt_regs *)args->regs;
 
-	id = _READ(regs->orig_ax);
+	id = _READ(PT_REGS_CALLNO(regs));
 #else
 	id = args->id;
 #endif
@@ -351,22 +315,22 @@ static __always_inline unsigned long bpf_syscall_get_argument_from_ctx(void *ctx
 
 	switch (idx) {
 	case 0:
-		arg = _READ(regs->di);
+		arg = _READ(PT_REGS_PARAM1(regs));
 		break;
 	case 1:
-		arg = _READ(regs->si);
+		arg = _READ(PT_REGS_PARAM2(regs));
 		break;
 	case 2:
-		arg = _READ(regs->dx);
+		arg = _READ(PT_REGS_PARAM3(regs));
 		break;
 	case 3:
-		arg = _READ(regs->r10);
+		arg = _READ(PT_REGS_PARAM4(regs));
 		break;
 	case 4:
-		arg = _READ(regs->r8);
+		arg = _READ(PT_REGS_PARAM5(regs));
 		break;
 	case 5:
-		arg = _READ(regs->r9);
+		arg = _READ(PT_REGS_PARAM6(regs));
 		break;
 	default:
 		arg = 0;
