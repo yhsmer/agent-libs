@@ -5311,8 +5311,7 @@ static __always_inline void perf_header_field_out(void *ctx, struct key_field *k
     return;	
 }
 
-static __always_inline void parse_grpc_header_encode(void *ctx, struct sysdig_bpf_settings *settings){
-	// struct pt_regs* regs = (struct pt_regs*) ctx;
+static __always_inline void bpf_probe_loopy_writer_write_header(void *ctx, struct sysdig_bpf_settings *settings){
     const void *sp = (const void *)_READ(((struct pt_regs*)ctx)->sp);
 
     uint32_t stream_id = 0;
@@ -5342,96 +5341,46 @@ static __always_inline void parse_grpc_header_encode(void *ctx, struct sysdig_bp
 
 	// Size of the golang hpack.HeaderField struct.
     const size_t header_field_size = 40;
-	size_t i = 0;
-// #pragma unroll 
-// 	for (; i < MAX_HEADER_COUNT; ++i)
-//     {
-//         if (i >= fields_len)
-//         {
-//             continue;
-//         }
+	
+#pragma unroll
+	for (size_t i = 0; i < MAX_HEADER_COUNT; ++i)
+    {
+        if (i >= fields_len)
+        {
+            continue;
+        }
         const void *header_field_ptr = fields_ptr + i * header_field_size;
         parse_header_field(&key.msg, &key.size, header_field_ptr);
-		printk("size: %d\n", key.size);
+		// printk("size: %d\n", key.size);
 		printk("stream_id: %d\n", stream_id);
 		printk("fd: %d\n", fd);
-        parse_header_field(&value.msg, &value.size, header_field_ptr + 16);
+		parse_header_field(&value.msg, &value.size, header_field_ptr + 16);
+		printk("%s\n", key.msg);
+		printk("%s\n", value.msg);
 
-		// // :status
-		// if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
-		// {
-		// 	break;
-		// }
-		// // grpc-status
-		// if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
-		// {
-		// 	break;
-		// }
-	// }
-
-	// perf_header_field_out(data, &key, &value);
-
-	enum ppm_event_type evt_type = PPME_GRPC_HEADER_ENCODE_E;
-    if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-			perf_header_field_out(ctx, &key, &value);
-    }
-}
-
-UP_FILLER(probe_loopy_writer_write_header){
-// static __always_inline int bpf_probe_loopy_writer_write_header(void *ctx){
-	struct pt_regs* regs = (struct pt_regs*)data->ctx;
-    const void *sp = (const void *)_READ(regs->sp);
-
-    uint32_t stream_id = 0;
-    bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
-
-    void *fields_ptr;
-    const int kFieldsPtrOffset = 24;
-    bpf_probe_read(&fields_ptr, sizeof(void *), sp + kFieldsPtrOffset);
-
-    int64_t fields_len;
-    const int kFieldsLenOffset = 8;
-    bpf_probe_read(&fields_len, sizeof(int64_t), sp + kFieldsPtrOffset + kFieldsLenOffset);
-
-    void *loopy_writer_ptr = NULL;
-    bpf_probe_read(&loopy_writer_ptr, sizeof(loopy_writer_ptr), sp + 8);
-
-    void *framer_ptr;
-    bpf_probe_read(&framer_ptr, sizeof(framer_ptr), loopy_writer_ptr + 40);
-
-    struct go_grpc_framer_t go_grpc_framer;
-    bpf_probe_read(&go_grpc_framer, sizeof(go_grpc_framer), framer_ptr);
-
-    const int32_t fd = get_fd_from_http2_Framer(go_grpc_framer.http2_framer);
-
-	struct key_field key = {0};
-	struct value_field value = {0};
-
-	// Size of the golang hpack.HeaderField struct.
-    const size_t header_field_size = 40;
-	size_t i = 0;
-// #pragma unroll 
-// 	for (; i < MAX_HEADER_COUNT; ++i)
-//     {
-//         if (i >= fields_len)
-//         {
-//             continue;
-//         }
-        const void *header_field_ptr = fields_ptr + i * header_field_size;
-        parse_header_field(&key.msg, &key.size, header_field_ptr);
-		printk("key_size: %d\n", key.size);
-		printk("stream_id: %d\n", stream_id);
-		printk("fd: %d\n", fd);
-        parse_header_field(&value.msg, &value.size, header_field_ptr + 16);
-
-	// int res;
-	// res = bpf_val_to_ring(data, key.size);
-	// res = bpf_val_to_ring(data, value.size);
-
-	// res = bpf_val_to_ring_type(data, (unsigned long long)key.msg, PT_CHARBUF);
-	// res = bpf_val_to_ring_type(data, (unsigned long long)value.msg, PT_CHARBUF);
-	return 0;
-
+		
+		// :status, grpc-status, :scheme, :path, :authority
+		if((key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a') ||
+			(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't') ||
+			(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h') ||
+			(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't') ||
+			(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
+		)
+		{
+			
+			if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_ENCODE_E, settings, UF_NEVER_DROP)) 
+			{
+				perf_header_field_out(ctx, &key, &value);
+			}
+			
+			// 加上if会超指令数，大概有2w条指令 > 4096条
+			// if((key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a') ||
+			// 	(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
+			// )
+			break;
+		}
+	}
+	
 }
 
 UP_FILLER(fun_uprobe_e)
@@ -5475,9 +5424,5 @@ char dev_name[16] = {0};
 
 //     return 0;
 // }
-
-
-// static __always_inline void record_cpu_ontime_and_out(void *ctx, struct sysdig_bpf_settings *settings, u32 pid, u32 tid, u64 start_ts, u64 delta)
-// {
 
 #endif
