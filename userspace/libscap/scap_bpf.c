@@ -44,6 +44,9 @@ limitations under the License.
 #include "../../driver/bpf/maps.h"
 #include "compat/misc.h"
 #include "compat/bpf.h"
+#define NONE         "\033[m"
+#define RED          "\033[0;32;31m"
+#define GREEN        "\033[0;32;32m"
 
 #ifdef MINIMAL_BUILD
 #undef MINIMAL_BUILD
@@ -631,7 +634,7 @@ static int32_t load_and_attach(scap_t *handle, const char *event, struct bpf_ins
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "failed to resolve symbol name '%s' error '%s'\n", func_symbol, strerror(errno));
 				return SCAP_UPROBE_SKIP;
 			}
-
+			printf(GREEN"%s:%s symbol exist\n"NONE, target_file_path, func_symbol);
 			char *identifier = generate_identifier(target_file_path);
 			snprintf(buf, sizeof(buf), "%s%s%s %s:0x%" PRIx64 "",
 				 is_uprobe ? "p:" : "r:", event, identifier, target_file_path, addr);
@@ -659,9 +662,8 @@ static int32_t load_and_attach(scap_t *handle, const char *event, struct bpf_ins
 
 	if(fd < 0)
 	{
-		puts("bpf_load_program fd error");
-		fprintf(stderr, "%s", error);
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s", errno, event, error);
+		fprintf(stderr, "%s", handle->m_lasterr);
 		free(error);
 		return SCAP_FAILURE;
 	}
@@ -796,6 +798,10 @@ static int32_t load_and_attach(scap_t *handle, const char *event, struct bpf_ins
 	if(target_file_path != NULL)
 	{
 		handle->m_uprobe_event_fd[handle->m_uprobe_prog_cnt] = efd;
+		puts("add uprobe successfully:");
+        printf("===event id %d\n",id);
+        printf("===event efd %d\n",efd);
+        printf("===prog fd %d\n",fd);
 	}
 	else
 	{

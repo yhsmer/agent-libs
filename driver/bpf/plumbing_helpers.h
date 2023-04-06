@@ -17,7 +17,15 @@ or GPL2.txt for full copies of the license.
 #include "types.h"
 #include "builtins.h"
 
-//#define BPF_DEBUG
+// #define BPF_DEBUG
+
+#ifndef printk
+# define printk(fmt, ...)                                      \
+    do {							\
+		char s[] = fmt;					\
+		bpf_trace_printk(s, sizeof(s), ##__VA_ARGS__);	\
+	} while (0)
+#endif
 
 #define _READ(P) ({ typeof(P) _val;				\
 		    memset(&_val, 0, sizeof(_val));		\

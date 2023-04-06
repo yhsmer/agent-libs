@@ -41,7 +41,7 @@ limitations under the License.
 // agent-libs running in container in production environment
 // the elf path differs in host and container
 // define HOST_MODE allows you to run agent-libs on the host;
-//#define HOST_MODE
+#define HOST_MODE
 
 extern sinsp_evttables g_infotables;
 static const char *bpf_probe;
@@ -1308,6 +1308,10 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
 }
 
 static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo){
+	cout << "thread: " << threadinfo->m_tid << ' ' << threadinfo->m_pid << ' '
+         << threadinfo->get_comm() << ' '
+         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
+	
     if(!bpf_probe)
     {
         bpf_probe = scap_get_bpf_probe_from_env();
