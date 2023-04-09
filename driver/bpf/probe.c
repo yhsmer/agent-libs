@@ -66,7 +66,9 @@ BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/tran
     if (!settings)
         return 0;
 
-	bpf_probe_loopy_writer_write_header(ctx, settings);
+	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_ENCODE_E, settings, UF_NEVER_DROP)) {
+		bpf_probe_loopy_writer_write_header(ctx);
+	}
     return 0;
 }
 

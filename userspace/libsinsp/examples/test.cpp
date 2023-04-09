@@ -119,9 +119,11 @@ int main(int argc, char **argv)
                 cout << ev->get_name() << " event ==> " << endl;
                 cout << "streamid: " << *((uint64_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
                 cout << "fd: " << *((uint64_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
-                cout << "key: " << ((char *)(ev->get_param_value_raw("key"))->m_val) << endl;
-                //cout << "key: " << *((char *)(ev->get_param_value_raw("key"))->m_len) << endl;
-                cout << "value: " << ((char *)(ev->get_param_value_raw("value"))->m_val) << endl;
+                cout << "status: " << ((char *)(ev->get_param_value_raw("status"))->m_val) << endl;
+                cout << "grpc_status: " << ((char *)(ev->get_param_value_raw("grpc_status"))->m_val) << endl;
+                cout << "scheme: " << ((char *)(ev->get_param_value_raw("scheme"))->m_val) << endl;
+                cout << "authority: " << ((char *)(ev->get_param_value_raw("authority"))->m_val) << endl;
+                cout << "path: " << ((char *)(ev->get_param_value_raw("path"))->m_val) << endl;
             }
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);

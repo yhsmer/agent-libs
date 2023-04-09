@@ -5281,39 +5281,9 @@ static __always_inline void parse_header_field(char *dst, int *size, const void 
     bpf_probe_read(dst, *size, str.ptr);
 }
 
-static __always_inline void perf_header_field_out(void *ctx, struct key_field *key, struct value_field *value){
-	struct filler_data data;
-    int res;
-
-    res = init_filler_data(ctx, &data, false);
-    if (res == PPM_SUCCESS) {
-        if (!data.state->tail_ctx.len)
-            write_evt_hdr(&data);
-
-        res = bpf_val_to_ring(&data, key->size);
-		if (res != PPM_SUCCESS)
-			return ;
-
-		res = bpf_val_to_ring(&data, value->size);
-		if (res != PPM_SUCCESS)
-			return ;
-
-		res = bpf_val_to_ring_type(&data, (unsigned long long)key->msg, PT_CHARBUF);
-		res = bpf_val_to_ring_type(&data, (unsigned long long)value->msg, PT_CHARBUF);
-    }
-
-    if (res == PPM_SUCCESS)
-        res = push_evt_frame(ctx, &data);
-
-    if (data.state)
-        data.state->tail_ctx.prev_res = res;
-
-    bpf_kp_terminate_filler(&data);
-    return;	
-}
-
-static __always_inline void bpf_probe_loopy_writer_write_header(void *ctx, struct sysdig_bpf_settings *settings){
-    const void *sp = (const void *)_READ(((struct pt_regs*)ctx)->sp);
+UP_FILLER(probe_loopy_writer_write_header){
+	struct pt_regs* regs = (struct pt_regs*) data->ctx;
+    const void *sp = (const void *)_READ(regs->sp);
 
     uint32_t stream_id = 0;
     bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
@@ -5337,8 +5307,6 @@ static __always_inline void bpf_probe_loopy_writer_write_header(void *ctx, struc
 
 	struct key_field key = {0};
 	struct value_field value = {0};
-
-	if(!prepare_filler(ctx, ctx, PPME_GRPC_HEADER_ENCODE_E, settings, UF_NEVER_DROP)) return;
 
 	struct value_field status = {0};
 	struct value_field grpc_status = {0};
@@ -5373,20 +5341,27 @@ static __always_inline void bpf_probe_loopy_writer_write_header(void *ctx, struc
 		else if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
 		{
 			parse_header_field(&scheme.msg, &scheme.size, fields_ptr + i * 40 + 16);
-			printk("%s\n", scheme.msg);
+			// printk("%s\n", scheme.msg);
 		}
 		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
 		{
 			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
-			printk("%s\n", authority.msg);
+			// printk("%s\n", authority.msg);
 		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
 		{
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
-			printk("%s\n", path.msg);
+			// printk("%s\n", path.msg);
 		}
-		// perf_header_field_out(ctx, &key, &value);
 	}
-	
+	int res;
+	res = bpf_val_to_ring(data, stream_id);
+	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)scheme.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)authority.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)path.msg, PT_CHARBUF);
+	return 0;
 }
 
 UP_FILLER(fun_uprobe_e)
