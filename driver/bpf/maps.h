@@ -201,7 +201,7 @@ struct bpf_map_def __bpf_section("maps") cpu_focus_threads = {
 
 // grpc
 #define MAX_HEADER_COUNT 32
-#define HEADER_FIELD_STR_SIZE 128
+#define HEADER_FIELD_STR_SIZE 40
 struct go_grpc_framer_t
 {
     void *writer;
@@ -216,12 +216,12 @@ struct go_interface
 
 struct key_field {
   uint32_t size;
-  char msg[128];
+  char msg[20];
 };
 
 struct value_field {
   uint32_t size;
-  char msg[128];
+  char msg[40];
 };
 
 // This matches the golang string object memory layout. Used to help read golang string objects in BPF code.

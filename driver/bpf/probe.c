@@ -58,7 +58,7 @@ int bpf_uret_##event(struct pt_regs *ctx)
 
 BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader)
 {
-	printk("Hello, world, from probe_loopy_writer_write_header\n");
+	// printk("Hello, world, from probe_loopy_writer_write_header\n");
 
     struct sysdig_bpf_settings *settings;
     
