@@ -72,6 +72,20 @@ BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/tran
     return 0;
 }
 
+BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
+{
+    struct sysdig_bpf_settings *settings;
+    
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+
+	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_SERVER_RECV_E, settings, UF_NEVER_DROP)) {
+		bpf_probe_http2_server_operate_headers(ctx);
+	}
+    return 0;
+}
+
 BPF_UPROBE(fun, main.fun)
 {
     struct sysdig_bpf_settings *settings;

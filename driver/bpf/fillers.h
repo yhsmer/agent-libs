@@ -5354,6 +5354,8 @@ UP_FILLER(probe_loopy_writer_write_header){
 		}
 	}
 	int res;
+	// printk("%d\n", bpf_get_current_pid_tgid() >> 32);
+	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
 	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
@@ -5363,6 +5365,92 @@ UP_FILLER(probe_loopy_writer_write_header){
 	res = bpf_val_to_ring_type(data, (unsigned long long)path.msg, PT_CHARBUF);
 	return 0;
 }
+
+UP_FILLER(probe_http2_server_operate_headers){
+	struct pt_regs* regs = (struct pt_regs*) data->ctx;
+    const void *sp = (const void *)_READ(regs->sp);
+
+    uint32_t stream_id = 0;
+    bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
+
+    void *fields_ptr;
+    bpf_probe_read(&fields_ptr, sizeof(void *), sp + 24);
+
+    int64_t fields_len;
+    bpf_probe_read(&fields_len, sizeof(int64_t), sp + 24 + 8);
+
+    void *loopy_writer_ptr = NULL;
+    bpf_probe_read(&loopy_writer_ptr, sizeof(loopy_writer_ptr), sp + 8);
+
+    void *framer_ptr;
+    bpf_probe_read(&framer_ptr, sizeof(framer_ptr), loopy_writer_ptr + 40);
+
+    struct go_grpc_framer_t go_grpc_framer;
+    bpf_probe_read(&go_grpc_framer, sizeof(go_grpc_framer), framer_ptr);
+
+    const int32_t fd = get_fd_from_http2_Framer(go_grpc_framer.http2_framer);
+
+	struct key_field key = {0};
+	struct value_field value = {0};
+
+	struct value_field status = {0};
+	struct value_field grpc_status = {0};
+	struct value_field scheme = {0};
+	struct value_field authority = {0};
+	struct value_field path = {0};
+
+	size_t i = 0;
+#pragma unroll
+	for (; i < 10; ++i)
+    {
+        if (i >= fields_len)
+        {
+            continue;
+        }
+		// Size of the golang hpack.HeaderField struct = 40
+        parse_header_field(&key.msg, &key.size, fields_ptr + i * 40);
+
+		// // :status, grpc-status, :scheme, :path, :authority
+		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
+		{
+			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", status.msg);
+			break;
+		}
+		else if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
+		{
+			parse_header_field(&grpc_status.msg, &grpc_status.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", grpc_status.msg);
+			break;
+		}
+		else if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
+		{
+			parse_header_field(&scheme.msg, &scheme.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", scheme.msg);
+		}
+		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
+		{
+			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", authority.msg);
+		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
+		{
+			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", path.msg);
+		}
+	}
+	int res;
+	// printk("%d\n", bpf_get_current_pid_tgid() >> 32);
+	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
+	res = bpf_val_to_ring(data, stream_id);
+	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)scheme.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)authority.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)path.msg, PT_CHARBUF);
+	return 0;
+}
+
 
 UP_FILLER(fun_uprobe_e)
 {
@@ -5379,19 +5467,6 @@ UP_FILLER(fun_uprobe_e)
 
     return 0;
 }
-/*
-char dev_name[16] = {0};
-#ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
-	skb = ctx->skb;
-	bpf_probe_read((void *)dev_name, 16, ctx->dev->name);
-#else
-	skb = (struct sk_buff*) ctx->skbaddr;
-	TP_DATA_LOC_READ(dev_name, name, 16);
-#endif
-	int res;
-
-	res = bpf_val_to_ring_type(data, (unsigned long long)dev_name, PT_CHARBUF);
-*/
 
 // UP_FILLER(fun_uprobe_x)
 // {

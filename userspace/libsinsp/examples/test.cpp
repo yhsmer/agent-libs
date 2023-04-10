@@ -117,6 +117,7 @@ int main(int argc, char **argv)
             }
             if(ev->get_type() == PPME_GRPC_HEADER_ENCODE_E){
                 cout << ev->get_name() << " event ==> " << endl;
+                cout << "pid: " << *((uint64_t *)(ev->get_param_value_raw("pid"))->m_val) << endl;
                 cout << "streamid: " << *((uint64_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
                 cout << "fd: " << *((uint64_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
                 cout << "status: " << ((char *)(ev->get_param_value_raw("status"))->m_val) << endl;
