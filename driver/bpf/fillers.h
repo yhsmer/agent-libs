@@ -5331,28 +5331,23 @@ UP_FILLER(probe_loopy_writer_write_header){
 		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
 		{
 			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", status.msg);
 			break;
 		}
 		else if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
 		{
 			parse_header_field(&grpc_status.msg, &grpc_status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", grpc_status.msg);
 			break;
 		}
 		else if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
 		{
 			parse_header_field(&scheme.msg, &scheme.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", scheme.msg);
 		}
 		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
 		{
 			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", authority.msg);
 		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
 		{
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", path.msg);
 		}
 	}
 	int res;
@@ -5394,10 +5389,6 @@ UP_FILLER(probe_http2_server_operate_headers){
 
     uint32_t stream_id;
     bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
-	
-	// printk("[recv probe]streamId: %d\n", stream_id);
-	// printk("[recv probe]fd: %d\n", fd);
-	// printk("[recv probe]fields_len: %d\n", fields_len);
 
 	struct key_field key = {0};
 	struct value_field scheme = {0};
@@ -5418,16 +5409,13 @@ UP_FILLER(probe_http2_server_operate_headers){
 		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
 		{
 			parse_header_field(&scheme.msg, &scheme.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", scheme.msg);
 		}
 		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
 		{
 			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", authority.msg);
 		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
 		{
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", path.msg);
 		}
 	}
     int res;
@@ -5486,13 +5474,11 @@ UP_FILLER(probe_http2_client_operate_headers){
 		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
 		{
 			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", status.msg);
 			break;
 		}
 		else if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
 		{
 			parse_header_field(&grpc_status.msg, &grpc_status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", grpc_status.msg);
 			break;
 		}
 	}
@@ -5504,34 +5490,5 @@ UP_FILLER(probe_http2_client_operate_headers){
 	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
 	return 0;
 }
-
-// UP_FILLER(fun_uprobe_e)
-// {
-//     int res;
-//     struct pt_regs* regs = (struct pt_regs*) data->ctx;
-//     const void *sp = (const void *)_READ(regs->sp);
-
-//     long a;
-//     bpf_probe_read(&a, 24, sp + 8);
-// 	// a = 77;
-//     res = bpf_val_to_ring(data, a);
-//     if (res != PPM_SUCCESS)
-//         return res;
-
-//     return 0;
-// }
-
-// UP_FILLER(fun_uprobe_x)
-// {
-//     int res;
-//     struct pt_regs* regs = (struct pt_regs*) data->ctx;
-//     int a = _READ(regs->ax);
-//     bpf_printk("uretprobe: %d \n", a);
-//     res = bpf_val_to_ring(data, a);
-//     if (res != PPM_SUCCESS)
-//         return res;
-
-//     return 0;
-// }
 
 #endif

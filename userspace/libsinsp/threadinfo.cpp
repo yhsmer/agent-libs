@@ -1309,9 +1309,9 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
 }
 
 static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo){
-	cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
-         << threadinfo->get_comm() << ' '
-         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
+	// cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
+    //      << threadinfo->get_comm() << ' '
+    //      <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
 	
     if(!bpf_probe)
     {
@@ -1439,7 +1439,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
             inodemap[file.st_ino]--;
             if(inode_to_idx[file.st_ino] != 0 && inodemap[file.st_ino] == 0)
             {
-           	    cout << GREEN << "inodemap(remove): " << target_file_path << " " << file.st_ino << " "<< inode_to_idx[file.st_ino] << NONE << endl;
+           	    // cout << GREEN << "inodemap(remove): " << target_file_path << " " << file.st_ino << " "<< inode_to_idx[file.st_ino] << NONE << endl;
 				m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_idx[file.st_ino]] = false;
 				close(m_inspector->m_h->m_uprobe_event_fd[inode_to_idx[file.st_ino]]);
 				close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_idx[file.st_ino]]);

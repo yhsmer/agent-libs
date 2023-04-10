@@ -802,36 +802,6 @@ BPF_UPROBE(probe_http2_client_operate_headers, google.golang.org/grpc/internal/t
     return 0;
 }
 
-// BPF_UPROBE(fun, main.fun)
-// {
-//     struct sysdig_bpf_settings *settings;
-//     enum ppm_event_type evt_type;
-//     settings = get_bpf_settings();
-//     if (!settings)
-//         return 0;
-
-//     evt_type = PPME_FUN_E;
-//     if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-//         bpf_fun_uprobe_e(ctx);
-//     }
-//     return 0;
-// }
-
-// BPF_URET_PROBE(uret_fun, fun)
-// {
-//     struct sysdig_bpf_settings *settings;
-//     enum ppm_event_type evt_type;
-//     settings = get_bpf_settings();
-//     if (!settings)
-//         return 0;
-
-//     evt_type = PPME_FUN_X;
-//     if(prepare_filler(ctx, ctx, evt_type, settings, UF_NEVER_DROP)) {
-//         bpf_fun_uprobe_x(ctx);
-//     }
-//     return 0;
-// }
-
 char kernel_ver[] __bpf_section("kernel_version") = UTS_RELEASE;
 
 char __license[] __bpf_section("license") = "GPL";
