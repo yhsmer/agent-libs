@@ -5246,6 +5246,16 @@ FILLER(cpu_analysis_e, false)
     return 0;
 }
 
+static __always_inline int32_t get_fd_from_conn_intf_core(struct go_interface conn_intf)
+{
+    void *fd_ptr;
+    bpf_probe_read(&fd_ptr, sizeof(fd_ptr), conn_intf.ptr);
+
+    int64_t sysfd;
+    bpf_probe_read(&sysfd, sizeof(int64_t), fd_ptr + 16);
+    return sysfd;
+}
+
 static __always_inline int32_t get_fd_from_http2_Framer(const void *framer_ptr)
 {
     struct go_interface io_writer_interface;
@@ -5256,22 +5266,15 @@ static __always_inline int32_t get_fd_from_http2_Framer(const void *framer_ptr)
     struct go_interface conn_intf;
     bpf_probe_read(&conn_intf, sizeof(conn_intf), io_writer_interface.ptr + 40);
 
-	void *fd_ptr;
-    bpf_probe_read(&fd_ptr, sizeof(fd_ptr), conn_intf.ptr);
-
-    int64_t sysfd;
-    bpf_probe_read(&sysfd, sizeof(int64_t), fd_ptr + 16);
-
-    return sysfd;
+    return get_fd_from_conn_intf_core(conn_intf);
 }
 
 static __always_inline void parse_header_field(char *dst, int *size, const void *header_field_ptr)
 {
-
     struct gostring str = {};
     bpf_probe_read(&str, sizeof(str), header_field_ptr);
     if (str.len <= 0)
-    {
+    {       
         *size = 0;
         return;
     }
@@ -5281,6 +5284,7 @@ static __always_inline void parse_header_field(char *dst, int *size, const void 
     bpf_probe_read(dst, *size, str.ptr);
 }
 
+// encode grpc-header, then send
 UP_FILLER(probe_loopy_writer_write_header){
 	struct pt_regs* regs = (struct pt_regs*) data->ctx;
     const void *sp = (const void *)_READ(regs->sp);
@@ -5306,7 +5310,6 @@ UP_FILLER(probe_loopy_writer_write_header){
     const int32_t fd = get_fd_from_http2_Framer(go_grpc_framer.http2_framer);
 
 	struct key_field key = {0};
-	struct value_field value = {0};
 
 	struct value_field status = {0};
 	struct value_field grpc_status = {0};
@@ -5314,9 +5317,8 @@ UP_FILLER(probe_loopy_writer_write_header){
 	struct value_field authority = {0};
 	struct value_field path = {0};
 
-	size_t i = 0;
 #pragma unroll
-	for (; i < 10; ++i)
+	for (size_t i = 0; i < 10; ++i)
     {
         if (i >= fields_len)
         {
@@ -5366,42 +5368,45 @@ UP_FILLER(probe_loopy_writer_write_header){
 	return 0;
 }
 
+// receive grpc-header
 UP_FILLER(probe_http2_server_operate_headers){
 	struct pt_regs* regs = (struct pt_regs*) data->ctx;
     const void *sp = (const void *)_READ(regs->sp);
 
-    uint32_t stream_id = 0;
-    bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
+	void *http2_server_ptr = NULL;
+    bpf_probe_read(&http2_server_ptr, sizeof(http2_server_ptr), sp + 8);
 
-    void *fields_ptr;
-    bpf_probe_read(&fields_ptr, sizeof(void *), sp + 24);
+    void *frame_ptr;
+    bpf_probe_read(&frame_ptr, sizeof(void *), sp + 16);
+
+    struct go_interface conn_intf;
+    bpf_probe_read(&conn_intf, sizeof(conn_intf), http2_server_ptr + 32);
+
+    const int32_t fd = get_fd_from_conn_intf_core(conn_intf);
+
+	void *fields_ptr;
+    bpf_probe_read(&fields_ptr, sizeof(void *), frame_ptr + 8);
 
     int64_t fields_len;
-    bpf_probe_read(&fields_len, sizeof(int64_t), sp + 24 + 8);
+    bpf_probe_read(&fields_len, sizeof(int64_t), frame_ptr + 8 + 8);
 
-    void *loopy_writer_ptr = NULL;
-    bpf_probe_read(&loopy_writer_ptr, sizeof(loopy_writer_ptr), sp + 8);
+    void *HeadersFrame_ptr;
+    bpf_probe_read(&HeadersFrame_ptr, sizeof(HeadersFrame_ptr), frame_ptr + 0);
 
-    void *framer_ptr;
-    bpf_probe_read(&framer_ptr, sizeof(framer_ptr), loopy_writer_ptr + 40);
-
-    struct go_grpc_framer_t go_grpc_framer;
-    bpf_probe_read(&go_grpc_framer, sizeof(go_grpc_framer), framer_ptr);
-
-    const int32_t fd = get_fd_from_http2_Framer(go_grpc_framer.http2_framer);
+    uint32_t stream_id;
+    bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
+	
+	printk("[recv probe]streamId: %d\n", stream_id);
+	printk("[recv probe]fd: %d\n", fd);
+	printk("[recv probe]fields_len: %d\n", fields_len);
 
 	struct key_field key = {0};
-	struct value_field value = {0};
-
-	struct value_field status = {0};
-	struct value_field grpc_status = {0};
 	struct value_field scheme = {0};
 	struct value_field authority = {0};
 	struct value_field path = {0};
 
-	size_t i = 0;
 #pragma unroll
-	for (; i < 10; ++i)
+	for (size_t i = 0; i < 10; ++i)
     {
         if (i >= fields_len)
         {
@@ -5410,20 +5415,8 @@ UP_FILLER(probe_http2_server_operate_headers){
 		// Size of the golang hpack.HeaderField struct = 40
         parse_header_field(&key.msg, &key.size, fields_ptr + i * 40);
 
-		// // :status, grpc-status, :scheme, :path, :authority
-		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
-		{
-			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", status.msg);
-			break;
-		}
-		else if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
-		{
-			parse_header_field(&grpc_status.msg, &grpc_status.size, fields_ptr + i * 40 + 16);
-			// printk("%s\n", grpc_status.msg);
-			break;
-		}
-		else if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
+		// :scheme, :path, :authority
+		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 'c' && key.msg[3] == 'h')
 		{
 			parse_header_field(&scheme.msg, &scheme.size, fields_ptr + i * 40 + 16);
 			// printk("%s\n", scheme.msg);
@@ -5438,13 +5431,10 @@ UP_FILLER(probe_http2_server_operate_headers){
 			// printk("%s\n", path.msg);
 		}
 	}
-	int res;
-	// printk("%d\n", bpf_get_current_pid_tgid() >> 32);
+    int res;
 	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
-	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
-	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)scheme.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)authority.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)path.msg, PT_CHARBUF);

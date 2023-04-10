@@ -216,7 +216,7 @@ struct go_interface
 
 struct key_field {
   uint32_t size;
-  char msg[20];
+  char msg[40];
 };
 
 struct value_field {
