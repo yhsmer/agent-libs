@@ -5327,7 +5327,7 @@ UP_FILLER(probe_loopy_writer_write_header){
 		// Size of the golang hpack.HeaderField struct = 40
         parse_header_field(&key.msg, &key.size, fields_ptr + i * 40);
 
-		// // :status, grpc-status, :scheme, :path, :authority
+		// :status, grpc-status, :scheme, :path, :authority
 		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
 		{
 			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
@@ -5356,7 +5356,6 @@ UP_FILLER(probe_loopy_writer_write_header){
 		}
 	}
 	int res;
-	// printk("%d\n", bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
@@ -5368,7 +5367,7 @@ UP_FILLER(probe_loopy_writer_write_header){
 	return 0;
 }
 
-// receive grpc-header
+// server side: receive grpc-header
 UP_FILLER(probe_http2_server_operate_headers){
 	struct pt_regs* regs = (struct pt_regs*) data->ctx;
     const void *sp = (const void *)_READ(regs->sp);
@@ -5396,9 +5395,9 @@ UP_FILLER(probe_http2_server_operate_headers){
     uint32_t stream_id;
     bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
 	
-	printk("[recv probe]streamId: %d\n", stream_id);
-	printk("[recv probe]fd: %d\n", fd);
-	printk("[recv probe]fields_len: %d\n", fields_len);
+	// printk("[recv probe]streamId: %d\n", stream_id);
+	// printk("[recv probe]fd: %d\n", fd);
+	// printk("[recv probe]fields_len: %d\n", fields_len);
 
 	struct key_field key = {0};
 	struct value_field scheme = {0};
@@ -5441,22 +5440,86 @@ UP_FILLER(probe_http2_server_operate_headers){
 	return 0;
 }
 
-
-UP_FILLER(fun_uprobe_e)
-{
-    int res;
-    struct pt_regs* regs = (struct pt_regs*) data->ctx;
+// client side: receive grpc-header
+UP_FILLER(probe_http2_client_operate_headers){
+	struct pt_regs* regs = (struct pt_regs*) data->ctx;
     const void *sp = (const void *)_READ(regs->sp);
 
-    long a;
-    bpf_probe_read(&a, 24, sp + 8);
-	// a = 77;
-    res = bpf_val_to_ring(data, a);
-    if (res != PPM_SUCCESS)
-        return res;
+    void *http2_client_ptr = NULL;
+    bpf_probe_read(&http2_client_ptr, sizeof(http2_client_ptr), sp + 8);
 
-    return 0;
+    void *frame_ptr;
+    bpf_probe_read(&frame_ptr, sizeof(void *), sp + 16);
+
+    struct go_interface conn_intf;
+    bpf_probe_read(&conn_intf, sizeof(conn_intf), http2_client_ptr + 64);
+
+    const int32_t fd = get_fd_from_conn_intf_core(conn_intf);
+
+    void *fields_ptr;
+    bpf_probe_read(&fields_ptr, sizeof(void *), frame_ptr + 8);
+
+    int64_t fields_len;
+    bpf_probe_read(&fields_len, sizeof(int64_t), frame_ptr + 8 + 8);
+
+    void *HeadersFrame_ptr;
+    bpf_probe_read(&HeadersFrame_ptr, sizeof(HeadersFrame_ptr), frame_ptr);
+
+    uint32_t stream_id;
+    bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
+
+	struct key_field key = {0};
+	struct value_field status = {0};
+	struct value_field grpc_status = {0};
+
+#pragma unroll
+	for (size_t i = 0; i < 10; ++i)
+    {
+        if (i >= fields_len)
+        {
+            continue;
+        }
+		// Size of the golang hpack.HeaderField struct = 40
+        parse_header_field(&key.msg, &key.size, fields_ptr + i * 40);
+
+		// :status, grpc-status
+		if(key.size == 7 && key.msg[0] == ':' && key.msg[1] == 's' && key.msg[2] == 't' && key.msg[3] == 'a')
+		{
+			parse_header_field(&status.msg, &status.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", status.msg);
+			break;
+		}
+		else if(key.size == 11 && key.msg[5] == 's' && key.msg[6] == 't' && key.msg[7] == 'a' && key.msg[8] == 't')
+		{
+			parse_header_field(&grpc_status.msg, &grpc_status.size, fields_ptr + i * 40 + 16);
+			// printk("%s\n", grpc_status.msg);
+			break;
+		}
+	}
+    int res;
+	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
+	res = bpf_val_to_ring(data, stream_id);
+	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
+	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
+	return 0;
 }
+
+// UP_FILLER(fun_uprobe_e)
+// {
+//     int res;
+//     struct pt_regs* regs = (struct pt_regs*) data->ctx;
+//     const void *sp = (const void *)_READ(regs->sp);
+
+//     long a;
+//     bpf_probe_read(&a, 24, sp + 8);
+// 	// a = 77;
+//     res = bpf_val_to_ring(data, a);
+//     if (res != PPM_SUCCESS)
+//         return res;
+
+//     return 0;
+// }
 
 // UP_FILLER(fun_uprobe_x)
 // {

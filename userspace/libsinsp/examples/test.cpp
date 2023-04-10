@@ -117,6 +117,7 @@ int main(int argc, char **argv)
             }
             if(ev->get_type() == PPME_GRPC_HEADER_ENCODE_E){
                 cout << ev->get_name() << " event ==> " << endl;
+                cout << "ts: " << ev->get_ts() << endl;
                 cout << "pid: " << *((uint64_t *)(ev->get_param_value_raw("pid"))->m_val) << endl;
                 cout << "streamid: " << *((uint64_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
                 cout << "fd: " << *((uint64_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
@@ -128,6 +129,7 @@ int main(int argc, char **argv)
             }
             if(ev->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E){
                 cout << ev->get_name() << " event ==> " << endl;
+                cout << "ts: " << ev->get_ts() << endl;
                 cout << "pid: " << *((uint64_t *)(ev->get_param_value_raw("pid"))->m_val) << endl;
                 cout << "streamid: " << *((uint64_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
                 cout << "fd: " << *((uint64_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
@@ -137,6 +139,7 @@ int main(int argc, char **argv)
             }
             if(ev->get_type() == PPME_GRPC_HEADER_CLIENT_RECV_E){
                 cout << ev->get_name() << " event ==> " << endl;
+                cout << "ts: " << ev->get_ts() << endl;
                 cout << "pid: " << *((uint64_t *)(ev->get_param_value_raw("pid"))->m_val) << endl;
                 cout << "streamid: " << *((uint64_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
                 cout << "fd: " << *((uint64_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
