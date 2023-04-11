@@ -41,7 +41,7 @@ limitations under the License.
 // agent-libs running in container in production environment
 // the elf path differs in host and container
 // define HOST_MODE allows you to run agent-libs on the host;
-#define HOST_MODE
+// #define HOST_MODE
 #define NONE         "\033[m"
 #define GREEN        "\033[0;32;32m"
 extern sinsp_evttables g_infotables;
