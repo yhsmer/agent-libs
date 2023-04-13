@@ -19,6 +19,14 @@ or GPL2.txt for full copies of the license.
 
 // #define BPF_DEBUG
 
+
+#define myprintk(fmt, ...)                                      \
+    do {							\
+		char s[] = fmt;					\
+		bpf_trace_printk(s, sizeof(s), ##__VA_ARGS__);	\
+	} while (0)
+
+
 #define _READ(P) ({ typeof(P) _val;				\
 		    memset(&_val, 0, sizeof(_val));		\
 		    bpf_probe_read(&_val, sizeof(_val), &P);	\

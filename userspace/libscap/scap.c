@@ -141,8 +141,8 @@ static uint32_t get_max_consumers()
 	return 0;
 }
 
-void handle_user_space_probe(scap_t *handle, const char *path, bool user_space_probe, const char *target_file_path) {
-	__handle_user_space_probe(handle, path, user_space_probe, target_file_path);
+bool load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *target_file_path) {
+	return __load_uprobe(handle, path, is_uprobe, target_file_path);
 }
 
 #ifndef _WIN32

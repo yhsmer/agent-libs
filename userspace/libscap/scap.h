@@ -637,7 +637,7 @@ scap_t* scap_open_offline_fd(int fd, char *error, int32_t *rc);
 */
 scap_t* scap_open(scap_open_args args, char *error, int32_t *rc);
 
-void handle_user_space_probe(scap_t *handle, const char *path, bool user_space_probe, const char *user_probe_path);
+bool load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *user_probe_path);
 
 /*!
   \brief Close a capture handle.

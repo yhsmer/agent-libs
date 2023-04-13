@@ -762,6 +762,7 @@ BPF_KPROBE(sock_sendmsg) {
 
 BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader)
 {
+	myprintk("probe_loopy_writer_write_header\n");
     struct sysdig_bpf_settings *settings;
     
     settings = get_bpf_settings();
@@ -776,6 +777,7 @@ BPF_UPROBE(probe_loopy_writer_write_header, google.golang.org/grpc/internal/tran
 
 BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders)
 {
+	myprintk("probe_http2_server_operate_headers\n");
     struct sysdig_bpf_settings *settings;
     
     settings = get_bpf_settings();
@@ -790,6 +792,7 @@ BPF_UPROBE(probe_http2_server_operate_headers, google.golang.org/grpc/internal/t
 
 BPF_UPROBE(probe_http2_client_operate_headers, google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders)
 {
+	myprintk("probe_http2_client_operate_headers\n");
     struct sysdig_bpf_settings *settings;
     
     settings = get_bpf_settings();
@@ -799,6 +802,19 @@ BPF_UPROBE(probe_http2_client_operate_headers, google.golang.org/grpc/internal/t
 	if(prepare_filler(ctx, ctx, PPME_GRPC_HEADER_CLIENT_RECV_E, settings, UF_NEVER_DROP)) {
 		bpf_probe_http2_client_operate_headers(ctx);
 	}
+    return 0;
+}
+
+BPF_UPROBE(fun, main.fun)
+{
+	myprintk("probe_fun\n");
+    struct sysdig_bpf_settings *settings;
+    settings = get_bpf_settings();
+    if (!settings)
+        return 0;
+    if(prepare_filler(ctx, ctx, PPME_FUN_E, settings, UF_NEVER_DROP)) {
+        bpf_fun_uprobe_e(ctx);
+    }
     return 0;
 }
 

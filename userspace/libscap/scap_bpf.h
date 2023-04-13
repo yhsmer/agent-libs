@@ -49,7 +49,7 @@ int32_t scap_bpf_get_n_tracepoint_hit(scap_t* handle, long* ret);
 int32_t scap_bpf_enable_skb_capture(scap_t *handle, const char *ifname);
 int32_t scap_bpf_disable_skb_capture(scap_t *handle);
 int32_t scap_bpf_handle_eventmask(scap_t* handle, uint32_t op, uint32_t event_id);
-void __handle_user_space_probe(scap_t *handle, const char *path, bool user_space_probe, const char *user_probe_path);
+bool __load_uprobe(scap_t *handle, const char *path, bool is_uprobe, const char *user_probe_path);
 
 static inline scap_evt *scap_bpf_evt_from_perf_sample(void *evt)
 {

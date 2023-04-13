@@ -40,14 +40,14 @@ limitations under the License.
 
 // agent-libs running in container in production environment
 // the elf path differs in host and container
-// define HOST_MODE allows you to run agent-libs on the host;
-// #define HOST_MODE
 #define NONE         "\033[m"
 #define GREEN        "\033[0;32;32m"
 extern sinsp_evttables g_infotables;
 static const char *bpf_probe;
+static int running_mode;
+
 unordered_map<unsigned long long, int> inodemap;
-unordered_map<int, int> inode_to_idx;
+unordered_map<int, int> inode_to_prog_idx;
 // tranform container path to host path
 unordered_map<string, string> hostpath;
 
@@ -1308,10 +1308,10 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
     strcat(target_file_path, file_path_from_proc);
 }
 
-static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo){
-	// cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
-    //      << threadinfo->get_comm() << ' '
-    //      <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
+static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
+	cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
+         << threadinfo->get_comm() << ' '
+         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
 	
     if(!bpf_probe)
     {
@@ -1343,28 +1343,44 @@ static void handle_user_space_probe(scap_t* handle, sinsp_threadinfo *threadinfo
         return;
     }
 
-#ifdef HOST_MODE
-    // debug mode;
-    target_file_path[0] = '\0';
-#else
-    // in production environment
-    target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
-    target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
-#endif
+	if(running_mode == 0)
+	{
+		char *mode = getenv("HOST_MODE");
+		if (mode != nullptr && strncmp("true", mode, sizeof(mode)) == 0) 
+		{
+			running_mode = 1;
+		}
+		else 
+			running_mode = 2;
+	}
+
+	if(running_mode == 1)
+	{
+		// runing in host mode;
+		target_file_path[0] = '\0';
+	}
+	else 
+	{
+		// runing in container
+		target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
+		target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
+	}
 
     to_host_path(target_file_path, threadinfo, file_path_from_proc);
 
     if(stat(target_file_path, &file) == -1)
     {
-        cout << "stat error file_path: " << target_file_path << endl;
-        perror("stat error(add_thread: handle_user_space_probe)");
+        cout << "[add_thread: handle_uprobe] stat error file_path: " << target_file_path << endl;
         return;
     }
     if(inodemap[file.st_ino] == 0)
     {
-        //TODO(yhsmer): if handle_user_space_probe return false, the file does not have any our hook func, can be marked as -1
-        handle_user_space_probe(handle, bpf_probe, true, target_file_path);
-        inode_to_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
+        //TODO(yhsmer): if handle_uprobe return false, the file does not have any our hook func, can be marked as -1
+        if(load_uprobe(handle, bpf_probe, true, target_file_path))
+		{
+        	inode_to_prog_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
+			cout << target_file_path << " [inode]" << file.st_ino << " -> [prog_idx]" << handle->m_uprobe_prog_cnt << endl;
+		}
     }
     inodemap[file.st_ino]++;
 }
@@ -1404,7 +1420,7 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 
     if(threadinfo->is_main_thread())
     {
-        handle_user_space_probe(m_inspector->m_h, threadinfo);
+        handle_uprobe(m_inspector->m_h, threadinfo);
     }
     return true;
 }
@@ -1418,31 +1434,45 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
     if(tinfo != nullptr && tinfo->is_main_thread())
     {
         static char target_file_path[1024] = {0};
-#ifdef HOST_MODE
-        // debug mode;
-        target_file_path[0] = '\0';
-#else
-        // in production environment
-    target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
-    target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
-#endif
+		
+		if(running_mode == 0)
+		{
+			char *mode = getenv("HOST_MODE");
+			if (mode != nullptr && strncmp("true", mode, sizeof(mode)) == 0) 
+			{
+				running_mode = 1;
+			}
+			else 
+				running_mode = 2;
+		}
+
+		if(running_mode == 1)
+		{
+			// runing in host mode;
+			target_file_path[0] = '\0';
+		}
+		else 
+		{
+			// runing in container
+			target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
+			target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
+		}
 
         to_host_path(target_file_path, tinfo, (char*)tinfo->get_exepath().c_str());
 
         if(stat(target_file_path, &file) == -1)
         {
-            cout << "stat error file_path(remove_thread): " << target_file_path << endl;
-            perror("stat error(remove_thread)");
+            cout << "[remove_thread: remove_uprobe]stat error file_path: " << target_file_path << endl;
         }
         else if(inodemap[file.st_ino] > 0)
         {
-            inodemap[file.st_ino]--;
-            if(inode_to_idx[file.st_ino] != 0 && inodemap[file.st_ino] == 0)
+            // inodemap[file.st_ino]--;
+            if(inodemap[file.st_ino] == 0 && inode_to_prog_idx[file.st_ino] != 0)
             {
-           	    // cout << GREEN << "inodemap(remove): " << target_file_path << " " << file.st_ino << " "<< inode_to_idx[file.st_ino] << NONE << endl;
-				m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_idx[file.st_ino]] = false;
-				close(m_inspector->m_h->m_uprobe_event_fd[inode_to_idx[file.st_ino]]);
-				close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_idx[file.st_ino]]);
+           	    cout << GREEN << "inodemap(remove): " << target_file_path << " [inode]" << file.st_ino << " [prog_idx]"<< inode_to_prog_idx[file.st_ino] << NONE << endl;
+				m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_prog_idx[file.st_ino]] = false;
+				close(m_inspector->m_h->m_uprobe_event_fd[inode_to_prog_idx[file.st_ino]]);
+				close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_prog_idx[file.st_ino]]);
             }
         }
     }
