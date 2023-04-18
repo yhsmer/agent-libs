@@ -1376,6 +1376,7 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
     if(inodemap[file.st_ino] == 0)
     {
         //TODO(yhsmer): if handle_uprobe return false, the file does not have any our hook func, can be marked as -1
+		cout << "load_uprobe: " << target_file_path << endl;
         if(load_uprobe(handle, bpf_probe, true, target_file_path))
 		{
         	inode_to_prog_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
