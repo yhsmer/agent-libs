@@ -5292,6 +5292,11 @@ UP_FILLER(probe_loopy_writer_write_header){
     uint32_t stream_id = 0;
     bpf_probe_read(&stream_id, sizeof(uint32_t), sp + 16);
 
+	bool end_stream = false;
+    bpf_probe_read(&end_stream, sizeof(bool), sp + 20);
+
+	myprintk("end_stream: %d\n", end_stream);
+
     void *fields_ptr;
     bpf_probe_read(&fields_ptr, sizeof(void *), sp + 24);
 
@@ -5358,9 +5363,9 @@ UP_FILLER(probe_loopy_writer_write_header){
 
 
 	int res;
-	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring(data, (uint32_t)end_stream);
 	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)scheme.msg, PT_CHARBUF);
@@ -5397,6 +5402,12 @@ UP_FILLER(probe_http2_server_operate_headers){
     uint32_t stream_id;
     bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
 
+	uint8_t flags;
+    bpf_probe_read(&flags, sizeof(uint8_t), HeadersFrame_ptr + 2);
+    const bool end_stream = flags & (0x1);
+
+	myprintk("end_stream: %d\n", end_stream);
+
 	struct key_field key = {0};
 	struct value_field scheme = {0};
 	struct value_field authority = {0};
@@ -5431,9 +5442,9 @@ UP_FILLER(probe_http2_server_operate_headers){
 	myprintk("path.msg: %s\n", path.msg);
 	
     int res;
-	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring(data, (uint32_t)end_stream);
 	res = bpf_val_to_ring_type(data, (unsigned long long)scheme.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)authority.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)path.msg, PT_CHARBUF);
@@ -5468,6 +5479,12 @@ UP_FILLER(probe_http2_client_operate_headers){
     uint32_t stream_id;
     bpf_probe_read(&stream_id, sizeof(uint32_t), HeadersFrame_ptr + 8);
 
+	uint8_t flags;
+    bpf_probe_read(&flags, sizeof(uint8_t), HeadersFrame_ptr + 2);
+    const bool end_stream = flags & (0x1);
+
+	myprintk("end_stream: %d\n", end_stream);
+
 	struct key_field key = {0};
 	struct value_field status = {0};
 	struct value_field grpc_status = {0};
@@ -5498,9 +5515,9 @@ UP_FILLER(probe_http2_client_operate_headers){
 	myprintk("grpc_status.msg: %s\n", grpc_status.msg);
 
     int res;
-	res = bpf_val_to_ring(data, bpf_get_current_pid_tgid() >> 32);
 	res = bpf_val_to_ring(data, stream_id);
 	res = bpf_val_to_ring(data, fd);
+	res = bpf_val_to_ring(data, (uint32_t)end_stream);
 	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
 	return 0;

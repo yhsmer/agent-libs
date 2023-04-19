@@ -25,3 +25,4 @@ driver/driver_config.h
 build*
 .idea/
 cmake-build-debug/
+kindling-falcolib-probe.tar.gz
