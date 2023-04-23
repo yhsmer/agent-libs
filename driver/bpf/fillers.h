@@ -5347,10 +5347,10 @@ UP_FILLER(probe_loopy_writer_write_header){
 		}
 		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
 		{
-			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
+			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
 		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
 		{
-			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
+			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
 		}
 	}
 
@@ -5420,10 +5420,11 @@ UP_FILLER(probe_http2_server_operate_headers){
 		}
 		else if(key.size == 5 && key.msg[0] == ':' && key.msg[1] == 'p' && key.msg[2] == 'a' && key.msg[3] == 't')
 		{
-			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
-		} else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
-		{
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
+		} 
+		else if(key.size == 10 && key.msg[0] == ':' && key.msg[1] == 'a' && key.msg[2] == 'u' && key.msg[3] == 't')
+		{
+			parse_header_field(&authority.msg, &authority.size, fields_ptr + i * 40 + 16);
 		}
 	}
 	

@@ -112,39 +112,6 @@ int main(int argc, char **argv)
         sinsp_threadinfo* thread = ev->get_thread_info();
         if(thread)
         {
-            if(ev->get_type() == PPME_GRPC_HEADER_ENCODE_E){
-                cout << ev->get_name() << " event ==> " << endl;
-                cout << "ts: " << ev->get_ts() << endl;
-                cout << "end_stream: " << *((uint32_t *)(ev->get_param_value_raw("end_stream"))->m_val) << endl;
-                cout << "streamid: " << *((uint32_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
-                cout << "fd: " << *((int32_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
-                cout << "status: " << ((char *)(ev->get_param_value_raw("status"))->m_val) << endl;
-                cout << "grpc_status: " << ((char *)(ev->get_param_value_raw("grpc_status"))->m_val) << endl;
-                cout << "scheme: " << ((char *)(ev->get_param_value_raw("scheme"))->m_val) << endl;
-                cout << "authority: " << ((char *)(ev->get_param_value_raw("authority"))->m_val) << endl;
-                cout << "path: " << ((char *)(ev->get_param_value_raw("path"))->m_val) << endl;
-            }
-            if(ev->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E){
-                cout << ev->get_name() << " event ==> " << endl;
-                cout << "ts: " << ev->get_ts() << endl;
-                cout << "end_stream: " << *((uint32_t *)(ev->get_param_value_raw("end_stream"))->m_val) << endl;
-                cout << "streamid: " << *((uint32_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
-                cout << "fd: " << *((int32_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
-                cout << "scheme: " << ((char *)(ev->get_param_value_raw("scheme"))->m_val) << endl;
-                cout << "authority: " << ((char *)(ev->get_param_value_raw("authority"))->m_val) << endl;
-                cout << "path: " << ((char *)(ev->get_param_value_raw("path"))->m_val) << endl;
-            }
-            if(ev->get_type() == PPME_GRPC_HEADER_CLIENT_RECV_E){
-                cout << ev->get_name() << " event ==> " << endl;
-                cout << "ts: " << ev->get_ts() << endl;
-                cout << "end_stream: " << *((uint32_t *)(ev->get_param_value_raw("end_stream"))->m_val) << endl;
-                cout << "streamid: " << *((uint32_t *)(ev->get_param_value_raw("streamid"))->m_val) << endl;
-                cout << "fd: " << *((int32_t *)(ev->get_param_value_raw("fd"))->m_val) << endl;
-                cout << "status: " << ((char *)(ev->get_param_value_raw("status"))->m_val) << endl;
-                cout << "grpc_status: " << ((char *)(ev->get_param_value_raw("grpc_status"))->m_val) << endl;
-            }
-
-
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);
 

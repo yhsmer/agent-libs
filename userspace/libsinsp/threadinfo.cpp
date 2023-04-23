@@ -1358,10 +1358,6 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
         strcat(target_file_path, container_path);
     }
     strcat(target_file_path, file_path_from_proc);
-	if(!threadinfo->m_container_id.empty())
-    {
-		cout << "target_file_path: " << target_file_path << endl;
-	}
 }
 
 static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
@@ -1431,7 +1427,7 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
         if(load_uprobe(handle, bpf_probe, true, target_file_path))
 		{
         	inode_to_prog_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
-			cout << target_file_path << " [inode]" << file.st_ino << " -> [prog_idx]" << handle->m_uprobe_prog_cnt << endl;
+			// cout << target_file_path << " [inode]" << file.st_ino << " -> [prog_idx]" << handle->m_uprobe_prog_cnt << endl;
 		}
     }
     inodemap[file.st_ino]++;
