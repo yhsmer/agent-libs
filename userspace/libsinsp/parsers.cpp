@@ -534,12 +534,6 @@ void sinsp_parser::event_cleanup(sinsp_evt *evt)
 //
 bool sinsp_parser::reset(sinsp_evt *evt)
 {
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E){
-		cout << GREEN << "start PPME_GRPC_HEADER_ENCODE_E " << evt->m_tinfo->m_latency << NONE << endl;
-	}
-	if(evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E){
-		cout << GREEN << "start PPME_GRPC_HEADER_SERVER_RECV_E " << evt->m_tinfo->m_latency << NONE << endl;
-	}
 	uint16_t etype = evt->get_type();
 	//
 	// Before anything can happen, the event needs to be
@@ -567,8 +561,6 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	{
 		evt->init();
 	}
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E || evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E)
-		cout << "1\n";
 
 	ppm_event_flags eflags = evt->get_info_flags();
 
@@ -600,8 +592,6 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	// If we're exiting a clone or if we have a scheduler event
 	// (many kernel thread), we don't look for /proc
 	//
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E || evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E)
-	cout << "2\n";
 
 	bool query_os;
 	if(etype == PPME_SYSCALL_CLONE_11_X ||
@@ -632,14 +622,11 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	{
 		evt->m_tinfo = &*m_inspector->get_thread_ref(evt->m_pevt->tid, query_os, false);
 	}
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E || evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E)
-	cout << "3.0\n";
+
 	if(etype == PPME_SCHEDSWITCH_6_E || (evt->get_info_flags() & EF_NONE_PARSE))
 	{
 		return false;
 	}
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E || evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E)
-	cout << "3\n";
 
 	if(!evt->m_tinfo)
 	{
@@ -665,19 +652,10 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 
 		return false;
 	}
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E || evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E)
-	cout << "4\n";
 
 	if(query_os)
 	{
 		evt->m_tinfo->m_flags |= PPM_CL_ACTIVE;
-	}
-
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E){
-		cout << GREEN << "before PPME_GRPC_HEADER_ENCODE_E " << evt->m_tinfo->m_latency << NONE << endl;
-	}
-	if(evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E){
-		cout << GREEN << "before PPME_GRPC_HEADER_SERVER_RECV_E " << evt->m_tinfo->m_latency << NONE << endl;
 	}
 
 	if(PPME_IS_ENTER(etype))
@@ -795,13 +773,6 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 				erase_fd(&eparams);
 			}
 		}
-	}
-
-	if(evt->get_type() == PPME_GRPC_HEADER_ENCODE_E){
-		cout << GREEN << "after PPME_GRPC_HEADER_ENCODE_E " << evt->m_tinfo->m_latency << NONE << endl;
-	}
-	if(evt->get_type() == PPME_GRPC_HEADER_SERVER_RECV_E){
-		cout << GREEN << "after PPME_GRPC_HEADER_SERVER_RECV_E " << evt->m_tinfo->m_latency << NONE << endl;
 	}
 	return true;
 }

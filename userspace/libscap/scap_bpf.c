@@ -663,7 +663,7 @@ static int32_t load_and_attach(scap_t *handle, const char *event, struct bpf_ins
 	if(fd < 0)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "bpf_load_program() err=%d event=%s message=%s\n", errno, event, error);
-		fprintf(stderr, RED"%s\n"NONE, handle->m_lasterr);
+		// fprintf(stderr, "%s\n", handle->m_lasterr);
 		free(error);
 		return SCAP_FAILURE;
 	}

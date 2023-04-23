@@ -361,9 +361,7 @@ const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {
 	/* PPME_GRPC_HEADER_SERVER_RECV_E */ {"grpc_header_server_recv", EC_NET, EF_USES_FD | EF_READS_FROM_FD | EF_DROP_SIMPLE_CONS, 6, {{"streamid", PT_UINT32, PF_DEC}, {"fd", PT_INT32, PF_DEC}, {"end_stream", PT_UINT32, PF_DEC}, {"scheme", PT_CHARBUF, PF_NA}, {"authority", PT_CHARBUF, PF_NA}, {"path", PT_CHARBUF, PF_NA}}},
 	/* PPME_GRPC_HEADER_SERVER_RECV_X */ {"grpc_header_server_recv", EC_NET, EF_USES_FD | EF_READS_FROM_FD | EF_DROP_SIMPLE_CONS, 0},
 	/* PPME_GRPC_HEADER_CLIENT_RECV_E */ {"grpc_header_client_recv", EC_NET, EF_USES_FD | EF_READS_FROM_FD | EF_DROP_SIMPLE_CONS, 5, {{"streamid", PT_UINT32, PF_DEC}, {"fd", PT_INT32, PF_DEC}, {"end_stream", PT_UINT32, PF_DEC}, {"status", PT_CHARBUF, PF_NA}, {"grpc_status", PT_CHARBUF, PF_NA}}},
-	/* PPME_GRPC_HEADER_CLIENT_RECV_X */ {"grpc_header_client_recv", EC_NET, EF_USES_FD | EF_READS_FROM_FD | EF_DROP_SIMPLE_CONS, 0},
-	/* PPME_FUN_E */{"myfun", EC_OTHER, EF_NONE, 1, {{"parameter", PT_UINT32, PF_DEC}}},
-	/* PPME_FUN_X */{"myfun", EC_OTHER, EF_NONE, 0}
+	/* PPME_GRPC_HEADER_CLIENT_RECV_X */ {"grpc_header_client_recv", EC_NET, EF_USES_FD | EF_READS_FROM_FD | EF_DROP_SIMPLE_CONS, 0}
 	/* NB: Starting from scap version 1.2, event types will no longer be changed when an event is modified, and the only kind of change permitted for pre-existent events is adding parameters.
 	 *     New event types are allowed only for new syscalls or new internal events.
 	 *     The number of parameters can be used to differentiate between event versions.

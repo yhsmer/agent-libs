@@ -40,7 +40,7 @@ Options:
   -h, --help                    Print this page
   -f <filter>                   Filter string for events (see https://falco.org/docs/rules/supported-fields/ for supported fields)
 )";
-    // cout << usage << endl;
+    cout << usage << endl;
 }
 
 //
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
             inspector.set_filter(filter_string);
         }
         catch(const sinsp_exception &e) {
-            // cerr << "[ERROR] Unable to set filter: " << e.what() << endl;
+            cerr << "[ERROR] Unable to set filter: " << e.what() << endl;
         }
     }
 
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
         }
         else if(res != SCAP_SUCCESS)
         {
-            // cout << "[ERROR] " << inspector.getlasterr() << endl;
+            cout << "[ERROR] " << inspector.getlasterr() << endl;
             sleep(g_backoff_timeout_secs);
 	        continue;
         }
@@ -112,9 +112,6 @@ int main(int argc, char **argv)
         sinsp_threadinfo* thread = ev->get_thread_info();
         if(thread)
         {
-            if(ev->get_type() == PPME_FUN_E){
-                cout << ev->get_name() << ' ' << "parameter: " << *((uint32_t *)(ev->get_param_value_raw("parameter"))->m_val) << endl;
-            }
             if(ev->get_type() == PPME_GRPC_HEADER_ENCODE_E){
                 cout << ev->get_name() << " event ==> " << endl;
                 cout << "ts: " << ev->get_ts() << endl;
@@ -147,6 +144,7 @@ int main(int argc, char **argv)
                 cout << "grpc_status: " << ((char *)(ev->get_param_value_raw("grpc_status"))->m_val) << endl;
             }
 
+
             string cmdline;
             sinsp_threadinfo::populate_cmdline(cmdline, thread);
 
@@ -156,39 +154,39 @@ int main(int argc, char **argv)
                 sinsp_utils::ts_to_iso_8601(ev->get_ts(), &date_time);
 
                 bool is_host_proc = thread->m_container_id.empty();
-                // cout << "[" << date_time << "]:["
-			    //           << (is_host_proc ? "HOST" : thread->m_container_id) << "]:";
+                cout << "[" << date_time << "]:["
+			              << (is_host_proc ? "HOST" : thread->m_container_id) << "]:";
 
-                // cout << "[CAT=";
+                cout << "[CAT=";
 
                 if(ev->get_category() == EC_PROCESS)
                 {
-                    // cout << "PROCESS]:";
+                    cout << "PROCESS]:";
                 }
                 else if(ev->get_category() == EC_NET)
                 {
-                    // cout << get_event_category(ev->get_category()) << "]:";
+                    cout << get_event_category(ev->get_category()) << "]:";
                     sinsp_fdinfo_t* fd_info = ev->get_fd_info();
 
                     // event subcategory should contain SC_NET if ipv4/ipv6
                     if(nullptr != fd_info && (fd_info->get_l4proto() != SCAP_L4_UNKNOWN && fd_info->get_l4proto() != SCAP_L4_NA))
                     {
-                        // cout << "[" << fd_info->tostring() << "]:";
+                        cout << "[" << fd_info->tostring() << "]:";
                     }
                 }
                 else if(ev->get_category() == EC_IO_READ || ev->get_category() == EC_IO_WRITE)
                 {
-                    // cout << get_event_category(ev->get_category()) << "]:";
+                    cout << get_event_category(ev->get_category()) << "]:";
                     
                     sinsp_fdinfo_t* fd_info = ev->get_fd_info();
                     if(nullptr != fd_info && (fd_info->get_l4proto() != SCAP_L4_UNKNOWN && fd_info->get_l4proto() != SCAP_L4_NA))
                     {
-                        // cout << "[" << fd_info->tostring() << "]:";
+                        cout << "[" << fd_info->tostring() << "]:";
                     }
                 }
                 else
                 {
-                    // cout << get_event_category(ev->get_category()) << "]:";
+                    cout << get_event_category(ev->get_category()) << "]:";
                 }
 
                 sinsp_threadinfo *p_thr = thread->get_parent_thread();
@@ -198,18 +196,18 @@ int main(int argc, char **argv)
                     parent_pid = p_thr->m_pid;
                 }
 
-                // cout << "[PPID=" << parent_pid << "]:"
-                //           << "[PID=" << thread->m_pid << "]:"
-                //           << "[TYPE=" << get_event_type(ev->get_type()) << "]:"
-                //           << "[EXE=" << thread->get_exepath() << "]:"
-                //           << "[CMD=" << cmdline << "]"
-                //           << endl;
+                cout << "[PPID=" << parent_pid << "]:"
+                          << "[PID=" << thread->m_pid << "]:"
+                          << "[TYPE=" << get_event_type(ev->get_type()) << "]:"
+                          << "[EXE=" << thread->get_exepath() << "]:"
+                          << "[CMD=" << cmdline << "]"
+                          << endl;
             }
         }
         else
         {
-            // cout << "[EVENT]:[" << get_event_category(ev->get_category()) << "]:"
-            //           << ev->get_name() << endl;
+            cout << "[EVENT]:[" << get_event_category(ev->get_category()) << "]:"
+                      << ev->get_name() << endl;
         }
     }
 

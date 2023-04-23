@@ -15,6 +15,11 @@ limitations under the License.
 
 */
 #include <iostream>
+#include <fstream>
+#include <cstring>
+#include <string>
+#include <sstream>
+#include <vector>
 
 #ifndef _WIN32
 #define __STDC_FORMAT_MACROS
@@ -1274,22 +1279,61 @@ void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* thr
 	}
 }
 
-void get_container_path(char *container_path, char *container_id){
-    // TODO(yhsmer): may have better solution
-    static char command[100] = "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' ";
-    // len{ "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' " } = 58
-    command[58] = '\0';
-    strcat(command, container_id);
+// void get_container_path(char *container_path, char *container_id){
+//     // TODO: may have better solution
+//     static char command[100] = "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' ";
+//     // len{ "docker inspect --format=\'{{.GraphDriver.Data.MergedDir}}\' " } = 58
+//     command[58] = '\0';
+//     strcat(command, container_id);
 
-    FILE *pp = popen(command, "r"); // build pipe
-    if (!pp)
+//     FILE *pp = popen(command, "r"); // build pipe
+//     if (!pp)
+//         return;
+
+//     // collect cmd execute result
+//     while (fgets(container_path, 1024, pp) != NULL){}
+
+//     pclose(pp);
+//     container_path[strlen(container_path) - 1] = '\0';
+// }
+
+void get_container_path(char* container_path, int pid) {
+    // 生成/proc/${pid}/mountinfo文件路径
+    std::stringstream ss;
+    ss << "/host/proc/" << pid << "/mountinfo";
+    std::string mountinfo_file = ss.str();
+
+    // 读取文件
+    std::ifstream fin(mountinfo_file.c_str());
+    if (!fin.is_open()) {
+        // std::cerr << "Failed to open file: " << mountinfo_file << std::endl;
+        container_path[0] = '\0';
         return;
+    }
 
-    // collect cmd execute result
-    while (fgets(container_path, 1024, pp) != NULL){}
+    // 提取container_path
+    std::string line;
+    while (std::getline(fin, line)) {
+        std::istringstream iss(line);
+        std::vector<std::string> tokens;
+        std::string token;
+        while (std::getline(iss, token, ',')) {
+            tokens.push_back(token);
+        }
+        for (int i = 0; i < tokens.size(); ++i) {
+            std::size_t pos = tokens[i].find("upperdir=");
+            if (pos != std::string::npos) {
+                std::string value = tokens[i].substr(pos + 9);
+                value.replace(value.size() - 4, 4, "merged");
+                strncpy(container_path, value.c_str(), 1024 - 1);
+                return;
+            }
+        }
+    }
 
-    pclose(pp);
-    container_path[strlen(container_path) - 1] = '\0';
+    // 未找到upperdir
+    // std::cerr << "Failed to find upperdir" << std::endl;
+    container_path[0] = '\0';
 }
 
 void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* file_path_from_proc){
@@ -1299,20 +1343,28 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
     if(!threadinfo->m_container_id.empty())
     {
         // process running in a container
-        strcpy(container_id, threadinfo->m_container_id.c_str());
-        get_container_path(container_path, container_id);
+        // strcpy(container_id, threadinfo->m_container_id.c_str());
+	
+		/*
+		cout << "container_id: " << container_id << endl;
+		cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
+         << threadinfo->get_comm() << ' '
+         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << ' ' 
+		 << threadinfo->get_exe() 
+		 << endl;
+		*/
 
+        get_container_path(container_path, threadinfo->m_pid);
         strcat(target_file_path, container_path);
-
     }
     strcat(target_file_path, file_path_from_proc);
+	if(!threadinfo->m_container_id.empty())
+    {
+		cout << "target_file_path: " << target_file_path << endl;
+	}
 }
 
 static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
-	cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
-         << threadinfo->get_comm() << ' '
-         <<  threadinfo->get_cwd() << ' ' << threadinfo->get_exepath() << endl;
-	
     if(!bpf_probe)
     {
         bpf_probe = scap_get_bpf_probe_from_env();
@@ -1329,7 +1381,7 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
     static char target_file_path[1024] = {0};
     struct stat file;
 
-    sprintf(proc_path, "/proc/%ld/exe", threadinfo->m_pid);
+    sprintf(proc_path, "/host/proc/%ld/exe", threadinfo->m_pid);
 
     static long buf_len;
     if((buf_len = readlink(proc_path, file_path_from_proc,1024)) <=0)
@@ -1370,13 +1422,12 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
 
     if(stat(target_file_path, &file) == -1)
     {
-        cout << "[add_thread: handle_uprobe] stat error file_path: " << target_file_path << endl;
+        // cout << "[add_thread: handle_uprobe] stat error file_path: " << target_file_path << endl;
         return;
     }
     if(inodemap[file.st_ino] == 0)
     {
-        //TODO(yhsmer): if handle_uprobe return false, the file does not have any our hook func, can be marked as -1
-		cout << "load_uprobe: " << target_file_path << endl;
+        //TODO: if handle_uprobe return false, the file does not have any our hook func, can be marked as -1
         if(load_uprobe(handle, bpf_probe, true, target_file_path))
 		{
         	inode_to_prog_idx[file.st_ino] = handle->m_uprobe_prog_cnt;
@@ -1461,16 +1512,14 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 
         to_host_path(target_file_path, tinfo, (char*)tinfo->get_exepath().c_str());
 
-        if(stat(target_file_path, &file) == -1)
-        {
-            cout << "[remove_thread: remove_uprobe]stat error file_path: " << target_file_path << endl;
-        }
+        if(stat(target_file_path, &file) == -1){}
         else if(inodemap[file.st_ino] > 0)
         {
+			// TODO
             // inodemap[file.st_ino]--;
             if(inodemap[file.st_ino] == 0 && inode_to_prog_idx[file.st_ino] != 0)
             {
-           	    cout << GREEN << "inodemap(remove): " << target_file_path << " [inode]" << file.st_ino << " [prog_idx]"<< inode_to_prog_idx[file.st_ino] << NONE << endl;
+           	    // cout << GREEN << "inodemap(remove): " << target_file_path << " [inode]" << file.st_ino << " [prog_idx]"<< inode_to_prog_idx[file.st_ino] << NONE << endl;
 				m_inspector->m_h->m_uprobe_array_idx_is_used[inode_to_prog_idx[file.st_ino]] = false;
 				close(m_inspector->m_h->m_uprobe_event_fd[inode_to_prog_idx[file.st_ino]]);
 				close(m_inspector->m_h->m_uprobe_prog_fds[inode_to_prog_idx[file.st_ino]]);

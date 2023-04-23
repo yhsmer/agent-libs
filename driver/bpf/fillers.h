@@ -5295,8 +5295,6 @@ UP_FILLER(probe_loopy_writer_write_header){
 	bool end_stream = false;
     bpf_probe_read(&end_stream, sizeof(bool), sp + 20);
 
-	myprintk("end_stream: %d\n", end_stream);
-
     void *fields_ptr;
     bpf_probe_read(&fields_ptr, sizeof(void *), sp + 24);
 
@@ -5355,12 +5353,6 @@ UP_FILLER(probe_loopy_writer_write_header){
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
 		}
 	}
-	myprintk("status.msg: %s\n", status.msg);
-	myprintk("grpc_status.msg: %s\n", grpc_status.msg);
-	myprintk("scheme.msg: %s\n", scheme.msg);
-	myprintk("authority.msg: %s\n", authority.msg);
-	myprintk("path.msg: %s\n", path.msg);
-
 
 	int res;
 	res = bpf_val_to_ring(data, stream_id);
@@ -5406,8 +5398,6 @@ UP_FILLER(probe_http2_server_operate_headers){
     bpf_probe_read(&flags, sizeof(uint8_t), HeadersFrame_ptr + 2);
     const bool end_stream = flags & (0x1);
 
-	myprintk("end_stream: %d\n", end_stream);
-
 	struct key_field key = {0};
 	struct value_field scheme = {0};
 	struct value_field authority = {0};
@@ -5436,10 +5426,6 @@ UP_FILLER(probe_http2_server_operate_headers){
 			parse_header_field(&path.msg, &path.size, fields_ptr + i * 40 + 16);
 		}
 	}
-
-	myprintk("scheme.msg: %s\n", scheme.msg);
-	myprintk("authority.msg: %s\n", authority.msg);
-	myprintk("path.msg: %s\n", path.msg);
 	
     int res;
 	res = bpf_val_to_ring(data, stream_id);
@@ -5483,8 +5469,6 @@ UP_FILLER(probe_http2_client_operate_headers){
     bpf_probe_read(&flags, sizeof(uint8_t), HeadersFrame_ptr + 2);
     const bool end_stream = flags & (0x1);
 
-	myprintk("end_stream: %d\n", end_stream);
-
 	struct key_field key = {0};
 	struct value_field status = {0};
 	struct value_field grpc_status = {0};
@@ -5511,8 +5495,6 @@ UP_FILLER(probe_http2_client_operate_headers){
 			break;
 		}
 	}
-	myprintk("status.msg: %s\n", status.msg);
-	myprintk("grpc_status.msg: %s\n", grpc_status.msg);
 
     int res;
 	res = bpf_val_to_ring(data, stream_id);
@@ -5521,22 +5503,6 @@ UP_FILLER(probe_http2_client_operate_headers){
 	res = bpf_val_to_ring_type(data, (unsigned long long)status.msg, PT_CHARBUF);
 	res = bpf_val_to_ring_type(data, (unsigned long long)grpc_status.msg, PT_CHARBUF);
 	return 0;
-}
-
-UP_FILLER(fun_uprobe_e)
-{
-    int res;
-    struct pt_regs* regs = (struct pt_regs*) data->ctx;
-    const void *sp = (const void *)_READ(regs->sp);
-
-    long a;
-    bpf_probe_read(&a, sizeof(a), sp + 8);
-	myprintk("a: %d\n",a);
-    res = bpf_val_to_ring(data, a);
-    if (res != PPM_SUCCESS)
-        return res;
-
-    return 0;
 }
 
 #endif
