@@ -49,6 +49,7 @@ limitations under the License.
 #define GREEN        "\033[0;32;32m"
 extern sinsp_evttables g_infotables;
 static const char *bpf_probe;
+// 1 running on host, 2 running in container
 static int running_mode;
 
 unordered_map<unsigned long long, int> inodemap;
@@ -1341,10 +1342,7 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
     static char container_id[20];
 
     if(!threadinfo->m_container_id.empty())
-    {
-        // process running in a container
-        // strcpy(container_id, threadinfo->m_container_id.c_str());
-	
+    {	
 		/*
 		cout << "container_id: " << container_id << endl;
 		cout << "thread: " << threadinfo->m_pid << ' ' << threadinfo->m_tid << ' '
@@ -1361,6 +1359,11 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
 }
 
 static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
+	if(handle->enable_uprobe == false) 
+	{
+		return;
+	}
+
     if(!bpf_probe)
     {
         bpf_probe = scap_get_bpf_probe_from_env();
@@ -1391,28 +1394,10 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
         return;
     }
 
-	if(running_mode == 0)
-	{
-		char *mode = getenv("HOST_MODE");
-		if (mode != nullptr && strncmp("true", mode, sizeof(mode)) == 0) 
-		{
-			running_mode = 1;
-		}
-		else 
-			running_mode = 2;
-	}
+	// runing in container
+	target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
+	target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
 
-	if(running_mode == 1)
-	{
-		// runing in host mode;
-		target_file_path[0] = '\0';
-	}
-	else 
-	{
-		// runing in container
-		target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
-		target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
-	}
 
     to_host_path(target_file_path, threadinfo, file_path_from_proc);
 
@@ -1479,6 +1464,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 	sinsp_threadinfo* tinfo = m_threadtable.get(tid);
     static struct stat file;
 
+	/*
     if(tinfo != nullptr && tinfo->is_main_thread())
     {
         static char target_file_path[1024] = {0};
@@ -1522,6 +1508,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
             }
         }
     }
+	*/
 
 	if(tinfo == nullptr)
 	{
