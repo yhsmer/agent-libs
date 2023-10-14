@@ -1359,11 +1359,6 @@ void to_host_path(char* target_file_path, sinsp_threadinfo *threadinfo, char* fi
 }
 
 static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
-	if(handle->enable_uprobe == false) 
-	{
-		return;
-	}
-
     if(!bpf_probe)
     {
         bpf_probe = scap_get_bpf_probe_from_env();
@@ -1380,7 +1375,7 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
     static char target_file_path[1024] = {0};
     struct stat file;
 
-    sprintf(proc_path, "/host/proc/%ld/exe", threadinfo->m_pid);
+    sprintf(proc_path, "/proc/%ld/exe", threadinfo->m_pid);
 
     static long buf_len;
     if((buf_len = readlink(proc_path, file_path_from_proc,1024)) <=0)
@@ -1395,9 +1390,11 @@ static void handle_uprobe(scap_t* handle, sinsp_threadinfo *threadinfo){
     }
 
 	// runing in container
+/*
 	target_file_path[0] = '/', target_file_path[1] = 'h', target_file_path[2] = 'o',
 	target_file_path[3] = 's', target_file_path[4] = 't', target_file_path[5] = '\0';
-
+*/
+	target_file_path[0] = '\0';
 
     to_host_path(target_file_path, threadinfo, file_path_from_proc);
 
